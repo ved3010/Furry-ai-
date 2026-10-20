@@ -1,0 +1,1105 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* 모든 캐릭터 SVG에 공통으로 적용되는 위쪽 padding — 머리 위 김(steam) 공간 확보 */
+:root {
+  --cat-top: 80px;
+  --cat-size: 100px;
+}
+
+/* drag region — 캐릭터 영역(윈도우 가운데 절반의 정사각형) */
+#drag-handle {
+  position: absolute;
+  top: var(--cat-top);
+  left: 50%;
+  transform: translateX(-50%);
+  width: var(--cat-size);
+  aspect-ratio: 1;
+  cursor: grab;
+}
+#drag-handle:active {
+  cursor: grabbing;
+}
+
+#share-name-badge {
+  position: absolute;
+  left: 50%;
+  top: calc(var(--cat-top) + var(--cat-size) + 5px);
+  transform: translateX(-50%);
+  display: none;
+  max-width: 80%;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: #171717;
+  font: 700 11px/1.1 "Galmuri11", "NeoDunggeunmo", "DungGeunMo", "Silkscreen", "Press Start 2P", Monaco, Menlo, monospace;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  -webkit-font-smoothing: none;
+  text-shadow:
+    -2px -2px 0 #fff,
+    -1px -2px 0 #fff,
+    0 -2px 0 #fff,
+    1px -2px 0 #fff,
+    2px -2px 0 #fff,
+    -2px -1px 0 #fff,
+    2px -1px 0 #fff,
+    -2px 0 0 #fff,
+    2px 0 0 #fff,
+    -2px 1px 0 #fff,
+    2px 1px 0 #fff,
+    -2px 2px 0 #fff,
+    -1px 2px 0 #fff,
+    0 2px 0 #fff,
+    1px 2px 0 #fff,
+    2px 2px 0 #fff;
+  font-smooth: never;
+  pointer-events: none;
+  z-index: 5;
+}
+
+body[data-sharing] #share-name-badge,
+body[data-show-name] #share-name-badge {
+  display: block;
+}
+
+body.dragging #share-name-badge {
+  display: none;
+}
+
+body[data-stretching] #share-name-badge {
+  display: none;
+}
+
+body[data-editing-name] #share-name-badge {
+  display: none;
+}
+
+#cat-speech-bubble-container {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% - var(--cat-top) + 4px - var(--bubble-overflow-y, 0px));
+  transform: translateX(-50%) translateY(var(--bubble-jump-y, 0px));
+  transition: transform 260ms cubic-bezier(0.2, 0.78, 0.25, 1);
+  display: none;
+  width: 100vw;
+  text-align: center;
+  pointer-events: none;
+  z-index: 6;
+}
+
+#cat-speech-bubble {
+  position: relative;
+  display: inline-block;
+  max-width: min(100vw, 400px);
+  box-sizing: border-box;
+  padding: 6px 8px;
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+  color: #111;
+  font: 700 13px/1.1 "Galmuri11", "NeoDunggeunmo", "DungGeunMo", "Silkscreen", "Press Start 2P", Monaco, Menlo, monospace;
+  text-align: center;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  pointer-events: none;
+}
+
+#cat-speech-bubble::before,
+#cat-speech-bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 9px;
+  height: 7px;
+  pointer-events: none;
+}
+
+#cat-speech-bubble::before {
+  bottom: -7px;
+  background: #000;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+#cat-speech-bubble::after {
+  bottom: -5px;
+  width: 7px;
+  height: 5px;
+  background: #fff;
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+}
+
+body[data-speech] #cat-speech-bubble-container {
+  display: block;
+}
+
+body[data-speech] #cat-speech-bubble {
+  animation: ai-bubble-pop 1.4s steps(2, end);
+}
+
+body[data-speech="timer"] #cat-speech-bubble {
+  border-radius: 0;
+  background: #fff;
+  font-size: 13px;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0px;
+  padding: 0;
+  pointer-events: auto;
+}
+
+body[data-pomodoro-mode="focus"][data-speech="timer"] #cat-speech-bubble {
+  color: #111;
+  background: #fff;
+}
+
+body[data-pomodoro-mode="focus"][data-speech="timer"] .pomodoro-timer-row {
+  color: #fff;
+  background: #e33b3b;
+}
+
+body[data-pomodoro-mode="focus"][data-speech="timer"] #cat-speech-bubble::after {
+  background: #e33b3b;
+}
+
+body[data-pomodoro-mode="rest"][data-speech="timer"] #cat-speech-bubble {
+  color: #111;
+  background: #fff;
+}
+
+body[data-pomodoro-mode="rest"][data-speech="timer"] .pomodoro-timer-row {
+  color: #fff;
+  background: #23a35b;
+}
+
+body[data-pomodoro-mode="rest"][data-speech="timer"] #cat-speech-bubble::after {
+  background: #23a35b;
+}
+
+body[data-pomodoro-paused][data-speech="timer"] #cat-speech-bubble {
+  opacity: 0.68;
+}
+
+body[data-speech="break"] #cat-speech-bubble {
+  color: #0d3d22;
+  background: #fff;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+body[data-speech="fixed"] #cat-speech-bubble {
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+}
+
+body[data-speech="focus"] #cat-speech-bubble {
+  color: #fff;
+  background: #e33b3b;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+body[data-speech="reminder"] #cat-speech-bubble {
+  color: #fff;
+  background: #e33b3b;
+}
+
+body[data-speech="focus"] #cat-speech-bubble::after {
+  background: #e33b3b;
+}
+
+body[data-speech="reminder"] #cat-speech-bubble::after {
+  background: #e33b3b;
+}
+
+body[data-speech="complete"] #cat-speech-bubble {
+  color: #fff;
+  background: #23a35b;
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+body[data-speech="complete"] #cat-speech-bubble::after {
+  background: #23a35b;
+}
+
+body[data-speech="update"] #cat-speech-bubble {
+  padding: 0;
+  border: 0;
+  pointer-events: auto;
+  cursor: pointer;
+  animation: none;
+  -webkit-app-region: no-drag;
+}
+
+body[data-speech="update"] #cat-speech-bubble::before,
+body[data-speech="update"] #cat-speech-bubble::after {
+  display: none;
+}
+
+#cat-speech-bubble .update-cta-button {
+  position: relative;
+  z-index: 1;
+  border: 1px solid #fff;
+  border-radius: 0;
+  background: #000;
+  color: #fff;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+  transform: scale(1);
+  transform-origin: center;
+  transition: transform 80ms steps(2, end);
+  will-change: transform;
+}
+
+#cat-speech-bubble .update-cta-button:active,
+#cat-speech-bubble .update-cta-button.is-pressed {
+  transform: scale(0.9);
+}
+
+#cat-speech-bubble button {
+  display: block;
+  min-width: 82px;
+  min-height: 28px;
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  color: #111;
+  font: inherit;
+  cursor: pointer;
+}
+
+#cat-speech-bubble button:disabled {
+  cursor: default;
+}
+
+#cat-speech-bubble button:hover:not(:disabled) {
+  cursor: pointer;
+}
+
+#reminder-clock-button {
+  position: absolute;
+  left: calc(50% + var(--cat-size) * 0.28);
+  top: calc(var(--cat-top) + var(--cat-size) * 0.04);
+  z-index: 8;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+  color: #111;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+body[data-reminder-button] #reminder-clock-button {
+  display: inline-flex;
+}
+
+#reminder-clock-button svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+  shape-rendering: crispEdges;
+}
+
+#reminder-clock-button:active,
+#reminder-clock-button.is-pressed {
+  transform: translateY(1px);
+}
+
+#voice-mic-button {
+  position: absolute;
+  left: calc(50% - var(--cat-size) * 0.28 - 24px);
+  top: calc(var(--cat-top) + var(--cat-size) * 0.04);
+  z-index: 8;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+  color: #111;
+  cursor: pointer;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+#voice-mic-button svg {
+  width: 16px;
+  height: 16px;
+  display: block;
+}
+
+#voice-mic-button:active,
+#voice-mic-button.is-pressed {
+  transform: translateY(1px);
+}
+
+#reminder-panel {
+  position: absolute;
+  left: 50%;
+  top: 42px;
+  transform: translateX(-50%);
+  z-index: 11;
+  display: none;
+  flex-direction: column;
+  width: min(calc(100vw - 16px), 360px);
+  max-height: calc(100vh - 50px);
+  padding: 7px;
+  border: 2px solid #000;
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.98);
+  box-sizing: border-box;
+  overflow: hidden;
+  pointer-events: auto;
+  -webkit-app-region: no-drag;
+}
+
+body[data-reminder-panel] #reminder-panel {
+  display: flex;
+}
+
+#reminder-form {
+  display: none;
+  gap: 5px;
+}
+
+body[data-reminder-form] #reminder-form {
+  display: grid;
+}
+
+.reminder-panel-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+body[data-reminder-form] .reminder-panel-header {
+  margin-bottom: 7px;
+}
+
+.reminder-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+#reminder-panel-title {
+  color: #111;
+  font: 800 13px/1 "Galmuri11", "NeoDunggeunmo", "DungGeunMo", "Silkscreen", Monaco, Menlo, monospace;
+}
+
+.reminder-schedule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  align-items: stretch;
+  gap: 5px;
+}
+
+.reminder-message-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  align-items: stretch;
+  gap: 5px;
+}
+
+.reminder-repeat-buttons {
+  display: flex;
+  align-items: stretch;
+  gap: 5px;
+}
+
+#reminder-form .reminder-repeat-buttons button {
+  width: max-content;
+  min-height: 24px;
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+  color: #111;
+  font: 700 11px/1 "Galmuri11", "NeoDunggeunmo", "DungGeunMo", "Silkscreen", Monaco, Menlo, monospace;
+  cursor: pointer;
+  padding: 3px 6px;
+  white-space: nowrap;
+}
+
+.reminder-day-picker {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px;
+}
+
+.reminder-day-picker[hidden] {
+  display: none;
+}
+
+.reminder-day-picker label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  min-height: 30px;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  background: #fff;
+  color: #111;
+  font: 700 10px/1 "Galmuri11", "NeoDunggeunmo", "DungGeunMo", "Silkscreen", Monaco, Menlo, monospace;
+  cursor: pointer;
+}
+
+.reminder-day-picker label:has(input:checked) {
+  background: #171717;
+  color: #fff;
+}
+
+.reminder-day-picker input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#reminder-time-input,
+#reminder-message-input {
+  min-width: 0;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  border-radius: 0;
+  padding: 4px 5px;
+  background: #fff;
+  color: #111;
+  font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  box-sizing: border-box;
+}
+
+#reminder-message-input {
+  height: 36px;
+}
+
+#reminder-form button,
+#reminder-add-button,
+#reminder-panel-close,
+.reminder-item button {
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #171717;
+  color: #fff;
+  font: 700 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  padding: 5px 7px;
+  cursor: pointer;
+}
+
+#reminder-add-button,
+#reminder-panel-close {
+  width: max-content;
+  white-space: nowrap;
+}
+
+#reminder-cancel-button,
+#reminder-save-button {
+  width: max-content;
+  height: 36px;
+  white-space: nowrap;
+}
+
+#reminder-form .reminder-repeat-buttons button {
+  background: #fff;
+  color: #111;
+}
+
+#reminder-form .reminder-repeat-buttons button.is-selected {
+  background: #171717;
+  color: #fff;
+}
+
+#reminder-list {
+  display: grid;
+  flex: 1 1 auto;
+  gap: 5px;
+  margin-top: 2px;
+  min-height: 0;
+  overflow: auto;
+}
+
+body[data-reminder-form] #reminder-list {
+  margin-top: 7px;
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.reminder-empty,
+.reminder-item {
+  color: #111;
+  font: 700 11px/1.25 "Galmuri11", "NeoDunggeunmo", "DungGeunMo", "Silkscreen", Monaco, Menlo, monospace;
+}
+
+.reminder-empty {
+  padding: 5px 2px 2px;
+  opacity: 0.7;
+}
+
+.reminder-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 5px;
+  padding-top: 5px;
+  border-top: 1px solid rgba(0, 0, 0, 0.25);
+}
+
+.reminder-item.is-disabled {
+  opacity: 0.48;
+}
+
+.reminder-message {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reminder-repeat {
+  color: #555;
+  font-size: 10px;
+}
+
+.pomodoro-timer-text {
+  display: inline-block;
+  text-align: left;
+}
+
+.pomodoro-fixed-message {
+  display: block;
+  max-width: min(88vw, 430px);
+  padding: 6px 8px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: keep-all;
+  text-align: center;
+}
+
+.pomodoro-timer-row {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 80px;
+  width: 100%;
+  margin: 0;
+  padding: 4px 4px 4px 6px;
+  white-space: nowrap;
+}
+
+.pomodoro-controls {
+  display: inline-flex;
+  margin-left: auto;
+  gap: 3px;
+}
+
+#cat-speech-bubble .pomodoro-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  width: 18px;
+  min-height: 18px;
+  height: 18px;
+  padding: 0;
+  border: 1px solid currentColor;
+  background: #fff;
+  color: #111;
+  font-size: 10px;
+  line-height: 16px;
+}
+
+.pomodoro-icon {
+  display: block;
+  width: 12px;
+  height: 12px;
+  shape-rendering: crispEdges;
+}
+
+#cat-speech-bubble .pomodoro-control:hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+body[data-speech="notice"] #cat,
+body[data-speech="break"] #cat,
+body[data-speech="focus"] #cat,
+body[data-speech="notice"] #press-left,
+body[data-speech="break"] #press-left,
+body[data-speech="focus"] #press-left,
+body[data-speech="notice"] #press-right,
+body[data-speech="break"] #press-right,
+body[data-speech="focus"] #press-right,
+body[data-speech="notice"] #stretch-pose-default,
+body[data-speech="break"] #stretch-pose-default,
+body[data-speech="focus"] #stretch-pose-default {
+  animation: ai-jump 0.42s steps(2, end) 4;
+}
+
+#cat-thinking-dots {
+  position: absolute;
+  left: calc(50% - var(--cat-size) * 0.39 - 19px);
+  top: calc(var(--cat-top) + 7%);
+  transform: translateX(-50%);
+  display: none;
+  padding: 5px 7px;
+  border-radius: 0;
+  background: #fff;
+  color: #111;
+  pointer-events: none;
+  z-index: 6;
+}
+
+body[data-thinking] #cat-thinking-dots {
+  display: flex;
+  gap: 3px;
+}
+
+#cat-thinking-dots span {
+  width: 5px;
+  height: 5px;
+  overflow: hidden;
+  color: transparent;
+  background: #111;
+  animation: thinking-dot 1.05s steps(2, end) infinite;
+}
+
+#cat-thinking-dots span:nth-child(2) { animation-delay: 0.16s; }
+#cat-thinking-dots span:nth-child(3) { animation-delay: 0.32s; }
+
+body[data-press] #cat-thinking-dots,
+body[data-scroll] #cat-thinking-dots,
+body.dragging #cat-thinking-dots,
+body[data-stretching] #cat-thinking-dots {
+  display: none;
+}
+
+@keyframes ai-jump {
+  0%, 100% { transform: translateX(-50%) translateY(0) scale(1); }
+  50% { transform: translateX(-50%) translateY(-18px) scale(1.04); }
+}
+
+@keyframes ai-bubble-pop {
+  0% { opacity: 0; transform: translateY(6px); }
+  15%, 85% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+
+@keyframes thinking-dot {
+  0%, 25% { opacity: 0.25; transform: translateY(0); }
+  50% { opacity: 1; transform: translateY(-2px); }
+  75%, 100% { opacity: 0.45; transform: translateY(0); }
+}
+
+#cat-name-editor,
+#user-name-editor,
+#pomodoro-focus-editor,
+#share-duration-editor {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: none;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px;
+  width: min(88vw, 220px);
+  padding: 5px;
+  border: 2px solid rgba(0, 0, 0, 0.8);
+  border-radius: 0;
+  background: rgba(255, 255, 255, 0.96);
+  box-sizing: border-box;
+}
+
+#cat-name-editor {
+  top: calc(var(--cat-top) + var(--cat-size) + 12px);
+}
+
+body[data-editing-name] #cat-name-editor {
+  display: grid;
+}
+
+#user-name-editor {
+  top: calc(var(--cat-top) + var(--cat-size) + 12px);
+  grid-template-columns: minmax(0, 1fr);
+  width: min(92vw, 320px);
+}
+
+body[data-editing-user-name] #user-name-editor {
+  display: grid;
+}
+
+#user-name-guide {
+  display: none;
+}
+
+.user-name-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px;
+}
+
+#fixed-message-editor {
+  display: none;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 4px;
+  width: min(100vw, 400px);
+  margin: 0 auto;
+  padding: 6px 8px;
+  border: 1px solid #000;
+  border-radius: 0;
+  background: #fff;
+  box-sizing: border-box;
+  pointer-events: auto;
+}
+
+body[data-editing-fixed-message] #cat-speech-bubble-container {
+  display: block;
+  pointer-events: auto;
+}
+
+body[data-editing-fixed-message] #cat-speech-bubble {
+  display: none;
+}
+
+body[data-editing-fixed-message] #fixed-message-editor {
+  display: grid;
+}
+
+#pomodoro-focus-editor {
+  top: 4px;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+body[data-editing-pomodoro-focus] #pomodoro-focus-editor {
+  display: grid;
+}
+
+#share-duration-editor {
+  top: calc(var(--cat-top) + 28%);
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+}
+
+body[data-editing-share-duration] #share-duration-editor {
+  display: grid;
+}
+
+#pomodoro-focus-editor span,
+#share-duration-editor span {
+  align-self: center;
+  color: #171717;
+  font: 700 10px/1 "Galmuri11", "NeoDunggeunmo", "DungGeunMo", "Silkscreen", Monaco, Menlo, monospace;
+}
+
+#cat-name-input,
+#user-name-input,
+#fixed-message-input,
+#pomodoro-focus-input,
+#share-duration-input {
+  min-width: 0;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 0;
+  padding: 4px 6px;
+  font: 600 12px/1.2 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+#cat-name-editor button,
+#user-name-editor button,
+#fixed-message-editor button,
+#pomodoro-focus-editor button,
+#share-duration-editor button {
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  border-radius: 0;
+  background: #171717;
+  color: #fff;
+  font: 700 11px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  padding: 0 7px;
+}
+
+#fixed-message-editor button,
+#user-name-editor button,
+#share-duration-editor button {
+  cursor: pointer;
+}
+
+#cat-name-editor button,
+#user-name-save {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  padding: 0;
+  cursor: pointer;
+}
+
+#cat-name-editor button svg,
+#user-name-save svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+  shape-rendering: crispEdges;
+}
+
+#cat-name-editor button:hover,
+#user-name-save:hover {
+  cursor: pointer;
+}
+
+#cat {
+  position: absolute;
+  top: var(--cat-top);
+  left: 50%;
+  transform: translateX(-50%);
+  width: var(--cat-size);
+  aspect-ratio: 1;
+  pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+}
+
+#purr-hearts {
+  position: absolute;
+  top: calc(var(--cat-top) - 2%);
+  left: 50%;
+  width: var(--cat-size);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  pointer-events: none;
+  display: none;
+  z-index: 4;
+}
+
+body[data-purring] #purr-hearts {
+  display: block;
+}
+
+#purr-hearts span {
+  position: absolute;
+  left: 42%;
+  top: 18%;
+  display: block;
+  width: 14.8%;
+  aspect-ratio: 8 / 6;
+  background: url("../assets/svg/heart.svg") center / contain no-repeat;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  opacity: 0;
+  transform: translate(0, 0) scale(0.6);
+  animation: purr-heart-pop 1.4s steps(4, end) infinite paused;
+}
+
+body[data-purring] #purr-hearts span {
+  animation-play-state: running;
+}
+
+#purr-hearts span:nth-child(2) {
+  left: 53%;
+  top: 16%;
+  width: 11.8%;
+  animation-delay: 0.24s;
+}
+
+#purr-hearts span:nth-child(3) {
+  left: 36%;
+  top: 23%;
+  width: 10%;
+  animation-delay: 0.48s;
+}
+
+@keyframes purr-heart-pop {
+  0% { opacity: 0; transform: translate(0, 0) scale(0.55); }
+  18% { opacity: 1; transform: translate(0, -7px) scale(1); }
+  62% { opacity: 1; transform: translate(5px, -22px) scale(0.9); }
+  100% { opacity: 0; transform: translate(9px, -34px) scale(0.65); }
+}
+
+/* Drag stretch SVG — end.svg가 표시 SVG. rect들의 y는 stretchT에 따라 start↔end 사이를 lerp.
+   viewBox는 JS에서 -20 0 80 144 로 확장 (좌우 흔들림 여유공간) */
+#stretch-svg-end {
+  position: absolute;
+  top: var(--cat-top);
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(var(--cat-size) * 1.5);
+  /* viewBox 확장 후 비율: 80:148 (외곽선 dilate 여유 위/아래 2씩 추가) */
+  aspect-ratio: 80 / 148;
+  pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  display: none;
+}
+
+/* Press/scroll/jump SVG들 — viewBox 외곽선 여유가 포함된 별도 포즈들 */
+#press-left, #press-right, #scroll-unroll, #jump-start, #jump-ing {
+  position: absolute;
+  top: var(--cat-top);
+  left: 50%;
+  transform: translateX(-50%);
+  aspect-ratio: 1;
+  pointer-events: none;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  display: none;
+}
+
+#press-left, #press-right, #scroll-unroll {
+  width: calc(var(--cat-size) * 0.98);
+}
+
+#jump-start, #jump-ing {
+  width: calc(var(--cat-size) * 1.12);
+}
+
+body[data-pomodoro-focus-start][data-press] #press-left,
+body[data-pomodoro-focus-start][data-press] #press-right {
+  width: calc(var(--cat-size) * 1.06);
+}
+
+body[data-press="left"] #cat { display: none; }
+body[data-press="left"] #press-left { display: block; }
+body[data-press="right"] #cat { display: none; }
+body[data-press="right"] #press-right { display: block; }
+
+body[data-scroll] #cat,
+body[data-scroll] #press-left,
+body[data-scroll] #press-right { display: none; }
+body[data-scroll] #scroll-unroll { display: block; }
+body[data-press] #scroll-unroll { display: none; }
+
+body[data-jump] #cat,
+body[data-jump] #press-left,
+body[data-jump] #press-right,
+body[data-jump] #scroll-unroll { display: none; }
+body[data-jump] #jump-start,
+body[data-jump] #jump-ing {
+  transform: translateX(-50%) translateY(var(--jump-y, 0px));
+  transition: transform 260ms cubic-bezier(0.2, 0.78, 0.25, 1);
+}
+body[data-jump="start"] #jump-start,
+body[data-jump="ing"] #jump-ing { display: block; }
+
+/* Stretching 자세 SVG — viewBox 72x56. 좌우 여백은 사냥 모드 꼬리 클리핑 방지용.
+   각 부위에 id가 붙어있어 SVG 내부 keyframes로 부위별 transform 애니메이션.
+   stretch-pose-ing.svg는 사용 안 함 (default 자세에서 transform으로 stretching 표현). */
+#stretch-pose-default {
+  position: absolute;
+  top: var(--cat-top);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  aspect-ratio: 72 / 56;
+  pointer-events: none;
+  overflow: visible;
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  display: none;
+}
+#stretch-pose-ing { display: none; }
+
+body[data-stretching] #cat,
+body[data-stretching] #press-left,
+body[data-hunting] #press-left,
+body[data-stretching] #press-right,
+body[data-hunting] #press-right,
+body[data-stretching] #scroll-unroll,
+body[data-hunting] #scroll-unroll,
+body[data-stretching] #jump-start,
+body[data-hunting] #jump-start,
+body[data-stretching] #jump-ing,
+body[data-hunting] #jump-ing { display: none; }
+body[data-stretching] #stretch-pose-default { display: block; }
+
+/* ── 타이핑 heat steam — 머리 위 빨간 김 particle들 ──
+   JS가 --steam-opacity 변수로 전체 opacity 조절 (heat > 0.5일 때만 보임) */
+#heat-steam {
+  position: absolute;
+  top: calc(var(--cat-top) - 60px);
+  left: calc(50% - 5px);
+  width: var(--cat-size);
+  aspect-ratio: 1;
+  transform: translateX(-50%);
+  pointer-events: none;
+  opacity: var(--steam-opacity, 0);
+  transition: opacity 0.25s ease;
+  z-index: 7;
+}
+.steam-particle {
+  position: absolute;
+  width: 3%;
+  height: 8%;
+  background: #ff4538;
+  top: 56%;
+  transform-origin: 50% 100%;  /* 아래쪽 고정 — scaleY 변화 시 위로 늘어남 */
+  image-rendering: pixelated;
+  animation: steam-rise 2s linear infinite paused;
+}
+
+body[data-heat-steam] .steam-particle {
+  animation-play-state: running;
+}
+.steam-particle:nth-child(1) { left: 32%; animation-delay: 0s;    }
+.steam-particle:nth-child(2) { left: 47%; animation-delay: 0.4s;  }
+.steam-particle:nth-child(3) { left: 62%; animation-delay: 0.8s;  }
+.steam-particle:nth-child(4) { left: 39%; animation-delay: 1.2s;  }
+.steam-particle:nth-child(5) { left: 55%; animation-delay: 1.6s;  }
+
+@keyframes steam-rise {
+  0%   { transform: translate(0, 0)     scaleY(0.4); opacity: 1; }
+  40%  { transform: translate(0, -80%)  scaleY(1.3); opacity: 1; }
+  70%  { transform: translate(0, -150%) scaleY(1.0); opacity: 0.8; }
+  100% { transform: translate(0, -220%) scaleY(0.5); opacity: 0; }
+}
+
+/* dragging / break stretching 중에는 김 효과 숨김 */
+body.dragging #heat-steam,
+body[data-stretching] #heat-steam { display: none; }
+
+body.dragging #purr-hearts,
+body[data-stretching] #purr-hearts,
+body[data-hunting] #purr-hearts,
+body[data-hunting-return] #purr-hearts,
+body[data-press] #purr-hearts,
+body[data-scroll] #purr-hearts,
+body[data-jump] #purr-hearts { display: none; }
+
+/* Drag stretch(stretch-end) 모드는 typing/break stretching보다 우선 */
+body.dragging #cat,
+body.dragging #press-left,
+body.dragging #press-right,
+body.dragging #scroll-unroll,
+body.dragging #jump-start,
+body.dragging #jump-ing,
+body.dragging #stretch-pose-default,
+body.dragging #stretch-pose-ing { display: none; }
+body.dragging #stretch-svg-end { display: block; }
