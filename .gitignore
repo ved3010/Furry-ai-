@@ -46,3 +46,6 @@ out/
 .env.test.local
 .env.production.local
 .env.local
+
+# Scratch and temporary testing files
+scratch/

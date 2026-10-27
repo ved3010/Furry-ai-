@@ -5,7 +5,7 @@
   <title>Comnyang</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body data-agent-search-hidden>
   <div id="drag-handle"></div>
   <div id="share-name-badge"></div>
   <div id="cat-speech-bubble-container">
@@ -28,14 +28,81 @@
       <rect x="8" y="8" width="3" height="2" fill="currentColor"/>
     </svg>
   </button>
-  <button id="voice-mic-button" type="button" aria-label="Start voice recognition">
-    <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
-      <rect x="6" y="2" width="4" height="7" rx="2" fill="currentColor"/>
-      <path d="M4 6v3a4 4 0 0 0 8 0V6" stroke="currentColor" stroke-width="1.2" fill="none"/>
-      <rect x="7" y="11" width="2" height="2" fill="currentColor"/>
-      <rect x="5" y="13" width="6" height="1.5" fill="currentColor"/>
-    </svg>
+  <button id="agent-search-toggle" type="button" aria-label="Open AI cat chat" title="Open AI cat chat" aria-controls="agent-panel" aria-expanded="false">
+    <span class="agent-toggle-icon">✦</span>
+    <span class="agent-toggle-text">Ask cat…</span>
   </button>
+  <section id="agent-panel" hidden inert aria-label="Cat assistant" lang="en">
+    <form id="agent-search-form" aria-label="Ask the cat">
+      <div id="agent-search-shell">
+        <div id="agent-search-drag" class="agent-search-drag" title="Drag to move" aria-label="Drag to move" aria-hidden="true">
+          <svg viewBox="0 0 10 16" width="10" height="14" fill="currentColor" aria-hidden="true" focusable="false">
+            <circle cx="3" cy="3" r="1.2"/>
+            <circle cx="7" cy="3" r="1.2"/>
+            <circle cx="3" cy="8" r="1.2"/>
+            <circle cx="7" cy="8" r="1.2"/>
+            <circle cx="3" cy="13" r="1.2"/>
+            <circle cx="7" cy="13" r="1.2"/>
+          </svg>
+        </div>
+        <button id="agent-search-hide" type="button" aria-label="Hide cat chat">×</button>
+        <input id="agent-search-input" type="text" maxlength="2000" aria-label="Ask your cat" placeholder="Ask your cat…" autocomplete="off">
+        <button id="voice-mic-button" type="button" aria-label="Start voice recognition" title="Voice input">
+          <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+            <rect x="6" y="2" width="4" height="7" rx="2" fill="currentColor"/>
+            <path d="M4 6v3a4 4 0 0 0 8 0V6" stroke="currentColor" stroke-width="1.2" fill="none"/>
+            <rect x="7" y="11" width="2" height="2" fill="currentColor"/>
+            <rect x="5" y="13" width="6" height="1.5" fill="currentColor"/>
+          </svg>
+        </button>
+        <button id="agent-search-send" type="submit" aria-label="Send question">↑</button>
+        <button id="agent-search-settings" type="button" aria-label="Agent settings" aria-controls="agent-settings-popover" aria-expanded="false">⚙</button>
+      </div>
+    </form>
+    <nav id="agent-quick-commands" aria-label="Quick commands">
+      <button type="button" data-agent-prompt="open Unstop" title="Ask to open Unstop">Unstop</button>
+      <button type="button" data-agent-prompt="play music" title="Ask for music options">Music</button>
+      <button type="button" data-agent-prompt="list tasks">Tasks</button>
+      <button type="button" data-agent-prompt="help">Help</button>
+    </nav>
+    <section id="agent-response" hidden aria-label="Agent response">
+      <header id="agent-response-header" title="Drag to move">
+        <span id="agent-response-status" role="status" aria-live="polite"></span>
+        <button id="agent-response-close" type="button" aria-label="Close response">×</button>
+      </header>
+      <div id="agent-response-scroll" tabindex="0" aria-label="Response details">
+        <div id="agent-chat-history"></div>
+        <p id="agent-response-prompt" hidden></p>
+        <div id="agent-response-text"></div>
+        <div id="agent-action-confirm" hidden role="group" aria-label="Action approval">
+          <p id="agent-action-description"></p>
+          <button type="button" id="agent-action-approve">Always allow</button>
+          <button type="button" id="agent-action-allow-once">Allow once</button>
+          <button type="button" id="agent-action-reject">No</button>
+        </div>
+      </div>
+      <button id="agent-response-retry" type="button" hidden>Retry</button>
+    </section>
+    <section id="agent-settings-popover" hidden aria-label="Agent settings">
+      <header id="agent-settings-header" title="Drag to move">
+        <span>Agent settings</span>
+        <button id="agent-settings-close" type="button" aria-label="Close settings">×</button>
+      </header>
+      <form id="agent-config-form">
+        <input id="agent-base-url" type="url" aria-label="API base URL" placeholder="Gemini OpenAI URL" autocomplete="off">
+        <input id="agent-model" type="text" aria-label="Model" placeholder="gemini-3.5-flash-lite" autocomplete="off">
+        <input id="agent-api-key" type="password" aria-label="API key" placeholder="Paste Gemini key" autocomplete="off">
+        <div>
+          <button type="button" id="agent-gemini-preset">Gemini</button>
+          <button type="submit">Save</button>
+          <button type="button" id="agent-api-key-clear">Forget</button>
+        </div>
+        <button type="button" id="agent-connection-test">Check API connection</button>
+        <button type="button" id="agent-approvals-clear">Forget saved permissions</button>
+        <span id="agent-config-status" role="status"></span>
+      </form>
+    </section>
+  </section>
   <section id="reminder-panel" aria-label="Reminders">
     <div class="reminder-panel-header">
       <div id="reminder-panel-title">알림</div>
@@ -142,5 +209,6 @@
   <div id="voice-music-player-container" style="display: none;"></div>
   <script src="cell-mappings.js"></script>
   <script src="renderer.js"></script>
+  <script src="agent-ui.js"></script>
 </body>
 </html>

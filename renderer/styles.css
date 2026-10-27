@@ -11,15 +11,16 @@ html, body {
 
 /* 모든 캐릭터 SVG에 공통으로 적용되는 위쪽 padding — 머리 위 김(steam) 공간 확보 */
 :root {
-  --cat-top: 80px;
+  --cat-top: 60px;
   --cat-size: 100px;
+  --cat-center-x: 75px;
 }
 
-/* drag region — 캐릭터 영역(윈도우 가운데 절반의 정사각형) */
+/* drag region — 캐릭터 영역 */
 #drag-handle {
   position: absolute;
   top: var(--cat-top);
-  left: 50%;
+  left: var(--cat-center-x);
   transform: translateX(-50%);
   width: var(--cat-size);
   aspect-ratio: 1;
@@ -31,7 +32,7 @@ html, body {
 
 #share-name-badge {
   position: absolute;
-  left: 50%;
+  left: var(--cat-center-x);
   top: calc(var(--cat-top) + var(--cat-size) + 5px);
   transform: translateX(-50%);
   display: none;
@@ -88,58 +89,64 @@ body[data-editing-name] #share-name-badge {
 
 #cat-speech-bubble-container {
   position: absolute;
-  left: 50%;
+  left: var(--cat-center-x);
   bottom: calc(100% - var(--cat-top) + 4px - var(--bubble-overflow-y, 0px));
   transform: translateX(-50%) translateY(var(--bubble-jump-y, 0px));
   transition: transform 260ms cubic-bezier(0.2, 0.78, 0.25, 1);
   display: none;
-  width: 100vw;
+  width: 180px;
   text-align: center;
-  pointer-events: none;
-  z-index: 6;
+  pointer-events: auto;
+  cursor: pointer;
+  z-index: 100 !important;
+}
+
+body:not([data-agent-search-hidden]) #cat-speech-bubble-container {
+  display: none !important;
+}
+
+body[data-speech] #agent-search-toggle {
+  display: none !important;
 }
 
 #cat-speech-bubble {
   position: relative;
   display: inline-block;
-  max-width: min(100vw, 400px);
+  max-width: min(calc(100vw - 20px), 256px);
   box-sizing: border-box;
-  padding: 6px 8px;
-  border: 1px solid #000;
-  border-radius: 0;
-  background: #fff;
-  color: #111;
-  font: 700 13px/1.1 "Galmuri11", "NeoDunggeunmo", "DungGeunMo", "Silkscreen", "Press Start 2P", Monaco, Menlo, monospace;
+  padding: 8px 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  border-radius: 20px;
+  background: #000000 !important;
+  color: #ffffff !important;
+  font: 600 13px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
   text-align: center;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: keep-all;
-  pointer-events: none;
-}
-
-#cat-speech-bubble::before,
-#cat-speech-bubble::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 9px;
-  height: 7px;
-  pointer-events: none;
+  pointer-events: auto;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.85), 0 2px 6px rgba(0, 0, 0, 0.4);
 }
 
 #cat-speech-bubble::before {
+  content: "";
+  position: absolute;
   bottom: -7px;
-  background: #000;
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  left: 50%;
+  transform: translateX(-50%);
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-top: 7px solid #000000;
+  background: transparent;
+  clip-path: none;
+  pointer-events: none;
 }
 
 #cat-speech-bubble::after {
-  bottom: -5px;
-  width: 7px;
-  height: 5px;
-  background: #fff;
-  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  display: none !important;
 }
 
 body[data-speech] #cat-speech-bubble-container {
@@ -147,7 +154,7 @@ body[data-speech] #cat-speech-bubble-container {
 }
 
 body[data-speech] #cat-speech-bubble {
-  animation: ai-bubble-pop 1.4s steps(2, end);
+  animation: cute-bubble-in 0.28s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
 }
 
 body[data-speech="timer"] #cat-speech-bubble {
@@ -199,50 +206,57 @@ body[data-pomodoro-paused][data-speech="timer"] #cat-speech-bubble {
 }
 
 body[data-speech="break"] #cat-speech-bubble {
-  color: #0d3d22;
-  background: #fff;
+  color: #ffffff !important;
+  background: #000000 !important;
+  border-radius: 20px !important;
   white-space: nowrap;
   overflow-wrap: normal;
   word-break: normal;
 }
 
 body[data-speech="fixed"] #cat-speech-bubble {
+  color: #ffffff !important;
+  background: #000000 !important;
+  border-radius: 20px !important;
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: keep-all;
 }
 
 body[data-speech="focus"] #cat-speech-bubble {
-  color: #fff;
-  background: #e33b3b;
+  color: #ffffff !important;
+  background: #000000 !important;
+  border-radius: 20px !important;
   white-space: nowrap;
   overflow-wrap: normal;
   word-break: normal;
 }
 
 body[data-speech="reminder"] #cat-speech-bubble {
-  color: #fff;
-  background: #e33b3b;
+  color: #ffffff !important;
+  background: #000000 !important;
+  border-radius: 20px !important;
 }
 
 body[data-speech="focus"] #cat-speech-bubble::after {
-  background: #e33b3b;
+  display: none !important;
 }
 
 body[data-speech="reminder"] #cat-speech-bubble::after {
-  background: #e33b3b;
+  display: none !important;
 }
 
 body[data-speech="complete"] #cat-speech-bubble {
-  color: #fff;
-  background: #23a35b;
+  color: #ffffff !important;
+  background: #000000 !important;
+  border-radius: 20px !important;
   white-space: nowrap;
   overflow-wrap: normal;
   word-break: normal;
 }
 
 body[data-speech="complete"] #cat-speech-bubble::after {
-  background: #23a35b;
+  display: none !important;
 }
 
 body[data-speech="update"] #cat-speech-bubble {
@@ -302,7 +316,7 @@ body[data-speech="update"] #cat-speech-bubble::after {
 
 #reminder-clock-button {
   position: absolute;
-  left: calc(50% + var(--cat-size) * 0.28);
+  left: calc(var(--cat-center-x) + var(--cat-size) * 0.28);
   top: calc(var(--cat-top) + var(--cat-size) * 0.04);
   z-index: 8;
   display: none;
@@ -336,36 +350,397 @@ body[data-reminder-button] #reminder-clock-button {
   transform: translateY(1px);
 }
 
-#voice-mic-button {
+#agent-panel {
   position: absolute;
-  left: calc(50% - var(--cat-size) * 0.28 - 24px);
-  top: calc(var(--cat-top) + var(--cat-size) * 0.04);
-  z-index: 8;
-  display: inline-flex;
+  left: 8px;
+  top: 8px;
+  right: 8px;
+  bottom: 8px;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transform: none;
+  color: #ffffff;
+  font: 500 12px/1.4 -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", sans-serif;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+
+#agent-panel *, #agent-search-toggle { box-sizing: border-box; }
+#agent-panel [hidden], #agent-panel[hidden],
+body[data-agent-search-hidden] #agent-panel { display: none !important; }
+
+#agent-search-form {
+  margin: 0;
+  flex: none;
+  width: 390px;
+  max-width: calc(100vw - 16px);
+}
+#agent-search-shell {
+  display: grid;
+  grid-template-columns: 20px 22px minmax(0, 1fr) 24px 24px 24px;
+  gap: 4px;
+  align-items: center;
+  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  border-radius: 22px;
+  background: #000000;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.85);
+  pointer-events: auto;
+  padding: 3px 8px;
+  transition: all 0.2s ease;
+}
+
+#agent-search-shell:focus-within {
+  border-color: rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.3);
+}
+
+#agent-search-shell input {
+  min-width: 0;
+  height: 28px;
+  padding: 3px 6px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #ffffff;
+  caret-color: #ffffff;
+  font: 500 13px/1.3 -apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif;
+  user-select: text;
+  -webkit-user-select: text;
+}
+#agent-search-shell input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+
+#agent-panel button {
+  min-height: 24px;
+  padding: 2px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  background: #1a1a1a;
+  color: #ffffff;
+  font: 600 11px/1.2 -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Segoe UI", sans-serif;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.12s ease;
+}
+#agent-panel button:hover:not(:disabled) {
+  background: #2a2a2a;
+}
+#agent-panel button:disabled { opacity: 0.5; cursor: wait; }
+#agent-panel :focus-visible, #agent-search-toggle:focus-visible {
+  outline: 2px solid #ffffff;
+  outline-offset: -2px;
+}
+#agent-search-shell button {
+  border: 0;
+  border-radius: 50%;
+  padding: 0;
+  font-size: 15px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  display: flex;
   align-items: center;
   justify-content: center;
   width: 24px;
   height: 24px;
-  padding: 0;
-  border: 1px solid #000;
-  border-radius: 0;
-  background: #fff;
-  color: #111;
+}
+#agent-search-shell button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+#agent-search-shell #voice-mic-button {
+  color: rgba(255, 255, 255, 0.7);
+}
+#agent-search-shell #voice-mic-button svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+#agent-search-shell #voice-mic-button:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
+  transform: scale(1.08);
+}
+#agent-search-shell #voice-mic-button:active {
+  transform: scale(0.95);
+}
+#agent-search-shell #voice-mic-button.is-listening {
+  color: #ff4757;
+  animation: mic-listening-pulse 1s infinite alternate;
+}
+@keyframes mic-listening-pulse {
+  from { transform: scale(1); opacity: 0.8; }
+  to { transform: scale(1.15); opacity: 1; }
+}
+#agent-search-shell #agent-search-send {
+  background: #ffffff;
+  color: #000000;
+  font-weight: 800;
+  font-size: 13px;
+  box-shadow: 0 2px 6px rgba(255, 255, 255, 0.3);
+}
+#agent-search-shell #agent-search-send:hover:not(:disabled) {
+  background: #e6e6e6;
+  transform: scale(1.08);
+}
+#agent-search-shell.is-busy {
+  border-style: dashed;
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+#agent-search-toggle {
+  position: absolute;
+  left: var(--cat-center-x);
+  top: 14px;
+  transform: translateX(-50%);
+  z-index: 12;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border: 1.5px solid rgba(255, 255, 255, 0.35);
+  border-radius: 20px;
+  background: #000000;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font: 600 12px/1 -apple-system, BlinkMacSystemFont, "SF Pro Rounded", "Nunito", system-ui, sans-serif;
   cursor: pointer;
   pointer-events: auto;
   -webkit-app-region: no-drag;
+  white-space: nowrap;
+  transition: transform 0.18s ease, background 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-#voice-mic-button svg {
-  width: 16px;
-  height: 16px;
+#agent-search-toggle:hover {
+  background: #1a1a1a;
+  border-color: rgba(255, 255, 255, 0.6);
+  transform: translateX(-50%) scale(1.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.95), 0 0 12px rgba(255, 255, 255, 0.25);
+}
+#agent-search-toggle .agent-toggle-icon {
+  font-size: 13px;
+  color: #ffffff;
+}
+#agent-search-toggle .agent-toggle-text {
+  font-size: 12px;
+  color: #e0e0e0;
+}
+#agent-search-toggle[data-busy] {
+  border-style: dashed;
+}
+#agent-search-toggle[data-attention]::after {
+  content: "";
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border: 1.5px solid #000000;
+  border-radius: 50%;
+  background: #ffffff;
+}
+body[data-agent-search-hidden] #agent-search-toggle { display: inline-flex; }
+
+#agent-quick-commands {
+  display: none !important; /* visually remove clunky toolbar while preserving elements for tests */
+}
+
+#agent-response, #agent-settings-popover {
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  border-radius: 18px;
+  background: #000000;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85);
+  pointer-events: auto;
+  color: #ffffff;
+}
+#agent-response {
+  position: absolute;
+  left: 130px;
+  top: 48px;
+  width: 334px;
+  max-height: 220px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  animation: cute-bubble-in 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+#agent-response header, #agent-settings-popover header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  flex: none;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.7);
+  background: transparent;
+}
+#agent-response header button, #agent-settings-popover header button {
+  border: 0;
+  min-width: 22px;
+  height: 22px;
+  font-size: 16px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.75);
+  border-radius: 50%;
+}
+#agent-response header button:hover, #agent-settings-popover header button:hover {
+  background: rgba(255, 255, 255, 0.15);
+  color: #ffffff;
+}
+#agent-response-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 10px 12px;
+  user-select: text;
+  -webkit-user-select: text;
+  overflow-wrap: anywhere;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+#agent-response-scroll::-webkit-scrollbar {
+  width: 5px;
+}
+#agent-response-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+#agent-response-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+}
+#agent-response-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.45);
+}
+#agent-chat-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  max-width: 88%;
+}
+.chat-msg-user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+.chat-msg-user .chat-msg-bubble {
+  background: #222222;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px 14px 2px 14px;
+  padding: 6px 10px;
+  font: 500 12.5px/1.38 -apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif;
+  word-break: break-word;
+}
+.chat-msg-cat {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+.chat-msg-cat .chat-msg-bubble {
+  background: #111111;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px 14px 14px 2px;
+  padding: 7px 11px;
+  font: 500 12.5px/1.42 -apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif;
+  word-break: break-word;
+}
+#agent-response-prompt {
+  align-self: flex-end;
+  max-width: 88%;
+  margin: 0;
+  padding: 6px 10px;
+  background: #222222;
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 14px 14px 2px 14px;
+  font: 500 12.5px/1.38 -apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+#agent-response-text {
+  align-self: flex-start;
+  max-width: 92%;
+  background: #111111;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px 14px 14px 2px;
+  padding: 7px 11px;
+  font: 500 12.5px/1.42 -apple-system, BlinkMacSystemFont, "SF Pro Rounded", system-ui, sans-serif;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+#agent-response-text:empty {
+  display: none;
+}
+#agent-response-retry {
+  flex: none;
+  align-self: flex-start;
+  margin: 0 10px 8px;
+  background: #ffffff !important;
+  color: #000000 !important;
+  border-radius: 12px;
+  font-weight: 700;
+  border: 0;
+}
+
+#agent-settings-popover {
+  position: absolute;
+  left: 8px;
+  top: 48px;
+  width: 350px;
+  max-height: 220px;
+  z-index: 13;
+  overflow-y: auto;
+  border-radius: 18px;
+}
+#agent-config-form { display: grid; gap: 6px; padding: 8px; }
+#agent-config-form input {
+  min-width: 0;
+  width: 100%;
+  padding: 5px 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  background: #181818;
+  color: #ffffff;
+  font: inherit;
+  user-select: text;
+  -webkit-user-select: text;
+}
+#agent-config-form input::placeholder {
+  color: rgba(255, 255, 255, 0.45);
+}
+#agent-config-form > div { display: flex; align-items: center; gap: 4px; }
+#agent-connection-test { width: 100%; }
+#agent-config-status {
   display: block;
+  min-height: 15px;
+  padding: 3px 5px;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  overflow-wrap: anywhere;
 }
 
-#voice-mic-button:active,
-#voice-mic-button.is-pressed {
-  transform: translateY(1px);
+#agent-action-confirm {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
 }
+#agent-action-description { margin: 0 0 6px; color: #ffffff; }
 
 #reminder-panel {
   position: absolute;
@@ -670,29 +1045,31 @@ body[data-speech="focus"] #stretch-pose-default {
 
 #cat-thinking-dots {
   position: absolute;
-  left: calc(50% - var(--cat-size) * 0.39 - 19px);
+  left: calc(var(--cat-center-x) - var(--cat-size) * 0.39 - 19px);
   top: calc(var(--cat-top) + 7%);
   transform: translateX(-50%);
   display: none;
-  padding: 5px 7px;
-  border-radius: 0;
-  background: #fff;
-  color: #111;
+  padding: 5px 8px;
+  border-radius: 12px;
+  background: #000000;
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.7);
   pointer-events: none;
-  z-index: 6;
+  z-index: 100;
 }
 
 body[data-thinking] #cat-thinking-dots {
   display: flex;
-  gap: 3px;
+  gap: 4px;
 }
 
 #cat-thinking-dots span {
   width: 5px;
   height: 5px;
+  border-radius: 50%;
   overflow: hidden;
   color: transparent;
-  background: #111;
+  background: #ffffff;
   animation: thinking-dot 1.05s steps(2, end) infinite;
 }
 
@@ -711,10 +1088,10 @@ body[data-stretching] #cat-thinking-dots {
   50% { transform: translateX(-50%) translateY(-18px) scale(1.04); }
 }
 
-@keyframes ai-bubble-pop {
-  0% { opacity: 0; transform: translateY(6px); }
-  15%, 85% { opacity: 1; transform: translateY(0); }
-  100% { opacity: 0; transform: translateY(-4px); }
+@keyframes cute-bubble-in {
+  0% { opacity: 0; transform: translateY(6px) scale(0.94); }
+  60% { transform: translateY(-2px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 @keyframes thinking-dot {
@@ -879,7 +1256,7 @@ body[data-editing-share-duration] #share-duration-editor {
 #cat {
   position: absolute;
   top: var(--cat-top);
-  left: 50%;
+  left: var(--cat-center-x);
   transform: translateX(-50%);
   width: var(--cat-size);
   aspect-ratio: 1;
@@ -891,7 +1268,7 @@ body[data-editing-share-duration] #share-duration-editor {
 #purr-hearts {
   position: absolute;
   top: calc(var(--cat-top) - 2%);
-  left: 50%;
+  left: var(--cat-center-x);
   width: var(--cat-size);
   aspect-ratio: 1;
   transform: translateX(-50%);
@@ -949,7 +1326,7 @@ body[data-purring] #purr-hearts span {
 #stretch-svg-end {
   position: absolute;
   top: var(--cat-top);
-  left: 50%;
+  left: var(--cat-center-x);
   transform: translateX(-50%);
   width: calc(var(--cat-size) * 1.5);
   /* viewBox 확장 후 비율: 80:148 (외곽선 dilate 여유 위/아래 2씩 추가) */
@@ -964,7 +1341,7 @@ body[data-purring] #purr-hearts span {
 #press-left, #press-right, #scroll-unroll, #jump-start, #jump-ing {
   position: absolute;
   top: var(--cat-top);
-  left: 50%;
+  left: var(--cat-center-x);
   transform: translateX(-50%);
   aspect-ratio: 1;
   pointer-events: none;
@@ -1015,9 +1392,9 @@ body[data-jump="ing"] #jump-ing { display: block; }
 #stretch-pose-default {
   position: absolute;
   top: var(--cat-top);
-  left: 50%;
+  left: var(--cat-center-x);
   transform: translateX(-50%);
-  width: 100%;
+  width: calc(var(--cat-size) * 1.5);
   aspect-ratio: 72 / 56;
   pointer-events: none;
   overflow: visible;
@@ -1045,7 +1422,7 @@ body[data-stretching] #stretch-pose-default { display: block; }
 #heat-steam {
   position: absolute;
   top: calc(var(--cat-top) - 60px);
-  left: calc(50% - 5px);
+  left: calc(var(--cat-center-x) - 5px);
   width: var(--cat-size);
   aspect-ratio: 1;
   transform: translateX(-50%);

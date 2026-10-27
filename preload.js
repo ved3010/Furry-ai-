@@ -1,1 +1,141 @@
-"use strict";var{contextBridge:r,ipcRenderer:o}=require("electron");r.exposeInMainWorld("electronAPI",{onCursorPos:e=>o.on("cursor-pos",(n,t)=>e(t)),onKeyPressed:e=>o.on("key-pressed",()=>e()),onMouseWheel:e=>o.on("mouse-wheel",(n,t)=>e(t)),onDoStretch:e=>o.on("do-stretch",()=>e()),onCancelStretch:e=>o.on("cancel-stretch",()=>e()),onDoJump:e=>o.on("do-jump",()=>e()),onShareRecord:e=>o.on("share-record",()=>e()),onShareCaptureCancel:e=>o.on("share-capture-cancel",()=>e()),onCatNameEdit:e=>o.on("cat-name-edit",(n,t)=>e(t)),onCatNameChanged:e=>o.on("cat-name-changed",(n,t)=>e(t)),onPetSizeChanged:e=>o.on("pet-size-changed",(n,t)=>e(t)),onAiTaskComplete:e=>o.on("ai-task-complete",(n,t)=>e(t)),onAiTaskState:e=>o.on("ai-task-state",(n,t)=>e(t)),onAiTaskNotification:e=>o.on("ai-task-notification",(n,t)=>e(t)),remindersGet:()=>o.invoke("reminders-get"),reminderAdd:e=>o.invoke("reminder-add",e),reminderUpdate:e=>o.invoke("reminder-update",e),reminderDelete:e=>o.invoke("reminder-delete",e),reminderEnabledSet:e=>o.invoke("reminder-enabled-set",e),onRemindersChanged:e=>o.on("reminders-changed",(n,t)=>e(t)),onReminderTriggered:e=>o.on("reminder-triggered",(n,t)=>e(t)),onReminderPanelOpen:e=>o.on("reminder-panel-open",()=>e()),onReminderSettingsChanged:e=>o.on("reminder-settings-changed",(n,t)=>e(t)),pomodoroGet:()=>o.invoke("pomodoro-get"),pomodoroStart:()=>o.invoke("pomodoro-start"),pomodoroPause:()=>o.invoke("pomodoro-pause"),pomodoroReset:()=>o.invoke("pomodoro-reset"),pomodoroFocusSet:e=>o.invoke("pomodoro-focus-set",e),pomodoroRestSet:e=>o.invoke("pomodoro-rest-set",e),onPomodoroFocusEdit:e=>o.on("pomodoro-focus-edit",(n,t)=>e(t)),onPomodoroRestEdit:e=>o.on("pomodoro-rest-edit",(n,t)=>e(t)),onPomodoroState:e=>o.on("pomodoro-state",(n,t)=>e(t)),onPomodoroComplete:e=>o.on("pomodoro-complete",(n,t)=>e(t)),onPomodoroFocusStart:e=>o.on("pomodoro-focus-start",()=>e()),onUpdateState:e=>o.on("update-state",(n,t)=>e(t)),onTaskCompleteSoundVolume:e=>o.on("task-complete-sound-volume",(n,t)=>e(t)),onSoundMuted:e=>o.on("sound-muted",(n,t)=>e(t)),updateCheck:()=>o.invoke("update-check"),updateDownload:()=>o.invoke("update-download"),updateInstall:()=>o.invoke("update-install"),dragWindow:(e,n)=>o.send("drag-window",e,n),dragWindowTo:(e,n,t,a)=>o.send("drag-window-to",e,n,t,a),dragWindowEnded:()=>o.send("drag-window-ended"),setMouseEventsEnabled:e=>o.send("set-mouse-events-enabled",e),showContextMenu:()=>o.send("show-context-menu"),setStretchMode:e=>o.send("set-stretch-mode",e),setHuntingMode:e=>o.send("set-hunting-mode",e),shareCaptureOptions:e=>o.invoke("share-capture-options",e),shareCaptureStarted:()=>o.invoke("share-capture-started"),shareCaptureOverlayHide:()=>o.invoke("share-capture-overlay-hide"),shareVideoSave:e=>o.invoke("share-video-save",e),shareErrorDialog:e=>o.invoke("share-error-dialog",e),userNameGet:()=>o.invoke("user-name-get"),userNameSet:e=>o.invoke("user-name-set",e),onUserNameEdit:e=>o.on("user-name-edit",(n,t)=>e(t)),onUserNameChanged:e=>o.on("user-name-changed",(n,t)=>e(t)),catNameGet:()=>o.invoke("cat-name-get"),catNameSet:e=>o.invoke("cat-name-set",e),catNameVisibleSet:e=>o.invoke("cat-name-visible-set",e),fixedMessageGet:()=>o.invoke("fixed-message-get"),fixedMessageSet:e=>o.invoke("fixed-message-set",e),onFixedMessageEdit:e=>o.on("fixed-message-edit",(n,t)=>e(t)),onFixedMessageChanged:e=>o.on("fixed-message-changed",(n,t)=>e(t)),catNamePromptShown:()=>o.invoke("cat-name-prompt-shown"),taskCompleteSoundVolumeGet:()=>o.invoke("task-complete-sound-volume-get"),taskCompleteSoundVolumeSet:e=>o.invoke("task-complete-sound-volume-set",e),soundMutedGet:()=>o.invoke("sound-muted-get"),soundMutedSet:e=>o.invoke("sound-muted-set",e),patternGet:()=>o.invoke("pattern-get"),patternSet:e=>o.send("pattern-set",e),patternPresetsGet:()=>o.invoke("pattern-presets-get"),patternCustomPresetSave:e=>o.invoke("pattern-custom-preset-save",e),patternCustomPresetDelete:e=>o.invoke("pattern-custom-preset-delete",e),patternCustomPresetRename:e=>o.invoke("pattern-custom-preset-rename",e),patternCustomPresetsExport:e=>o.invoke("pattern-custom-presets-export",e),patternCustomPresetsImport:()=>o.invoke("pattern-custom-presets-import"),patternConfirmClearAll:e=>o.invoke("pattern-confirm-clear-all",e),patternConfirmDeletePreset:e=>o.invoke("pattern-confirm-delete-preset",e),patternConfirmDiscardChanges:e=>o.invoke("pattern-confirm-discard-changes",e),onPatternChanged:e=>o.on("pattern-changed",(n,t)=>e(t)),openPatternEditor:()=>o.send("open-pattern-editor"),openMappingEditor:()=>o.send("open-mapping-editor"),mappingLoad:()=>o.invoke("mapping-load"),mappingSave:e=>o.invoke("mapping-save",e),svgLoad:e=>o.invoke("svg-load",e),licenseActivate:e=>o.invoke("license-activate",e),licenseCurrent:()=>o.invoke("license-current"),openLandingPage:()=>o.invoke("open-landing-page"),openLicenseResetPage:()=>o.invoke("open-license-reset-page"),onLicenseError:e=>o.on("license-error",(n,t)=>e(t)),languageGet:()=>o.invoke("language-get"),languageSet:e=>o.invoke("language-set",e),onLanguageChanged:e=>o.on("language-changed",(n,t)=>e(t))});r.exposeInMainWorld("voiceAPI",{onPlaySong:e=>o.on("play-song",(n,t)=>e(t)),onStopSong:e=>o.on("stop-song",()=>e()),onVoiceHeard:e=>o.on("voice-heard",(n,t)=>e(t)),startListening:()=>o.send("voice-start-listening")});
+"use strict";
+
+const { contextBridge, ipcRenderer } = require("electron");
+
+const on = (channel, callback) => ipcRenderer.on(channel, (_event, ...args) => callback(...args));
+const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
+const send = (channel, ...args) => ipcRenderer.send(channel, ...args);
+
+// The pet renderer caches its own hit-test result. Keep the agent's temporary
+// pointer ownership separate so leaving the panel restores that cached result.
+let petMouseEventsEnabled = false;
+let agentInteractionActive = false;
+let mouseEventsEnabled;
+function syncMouseEvents() {
+  const enabled = petMouseEventsEnabled || agentInteractionActive;
+  if (enabled === mouseEventsEnabled) return;
+  mouseEventsEnabled = enabled;
+  send("set-mouse-events-enabled", enabled);
+}
+
+contextBridge.exposeInMainWorld("electronAPI", {
+  onCursorPos: (callback) => on("cursor-pos", callback),
+  onKeyPressed: (callback) => on("key-pressed", callback),
+  onMouseWheel: (callback) => on("mouse-wheel", callback),
+  onDoStretch: (callback) => on("do-stretch", callback),
+  onCancelStretch: (callback) => on("cancel-stretch", callback),
+  onDoJump: (callback) => on("do-jump", callback),
+  onShareRecord: (callback) => on("share-record", callback),
+  onShareCaptureCancel: (callback) => on("share-capture-cancel", callback),
+  onCatNameEdit: (callback) => on("cat-name-edit", callback),
+  onCatNameChanged: (callback) => on("cat-name-changed", callback),
+  onPetSizeChanged: (callback) => on("pet-size-changed", callback),
+  onAiTaskComplete: (callback) => on("ai-task-complete", callback),
+  onAiTaskState: (callback) => on("ai-task-state", callback),
+  onAiTaskNotification: (callback) => on("ai-task-notification", callback),
+  onCatOpenChat: (callback) => on("cat-open-chat", callback),
+  remindersGet: () => invoke("reminders-get"),
+  reminderAdd: (value) => invoke("reminder-add", value),
+  reminderUpdate: (value) => invoke("reminder-update", value),
+  reminderDelete: (value) => invoke("reminder-delete", value),
+  reminderEnabledSet: (value) => invoke("reminder-enabled-set", value),
+  onRemindersChanged: (callback) => on("reminders-changed", callback),
+  onReminderTriggered: (callback) => on("reminder-triggered", callback),
+  onReminderPanelOpen: (callback) => on("reminder-panel-open", callback),
+  onReminderSettingsChanged: (callback) => on("reminder-settings-changed", callback),
+  pomodoroGet: () => invoke("pomodoro-get"),
+  pomodoroStart: () => invoke("pomodoro-start"),
+  pomodoroPause: () => invoke("pomodoro-pause"),
+  pomodoroReset: () => invoke("pomodoro-reset"),
+  pomodoroFocusSet: (value) => invoke("pomodoro-focus-set", value),
+  pomodoroRestSet: (value) => invoke("pomodoro-rest-set", value),
+  onPomodoroFocusEdit: (callback) => on("pomodoro-focus-edit", callback),
+  onPomodoroRestEdit: (callback) => on("pomodoro-rest-edit", callback),
+  onPomodoroState: (callback) => on("pomodoro-state", callback),
+  onPomodoroComplete: (callback) => on("pomodoro-complete", callback),
+  onPomodoroFocusStart: (callback) => on("pomodoro-focus-start", callback),
+  onUpdateState: (callback) => on("update-state", callback),
+  onTaskCompleteSoundVolume: (callback) => on("task-complete-sound-volume", callback),
+  onSoundMuted: (callback) => on("sound-muted", callback),
+  updateCheck: () => invoke("update-check"),
+  updateDownload: () => invoke("update-download"),
+  updateInstall: () => invoke("update-install"),
+  dragWindow: (x, y) => send("drag-window", x, y),
+  dragWindowTo: (screenX, screenY, startX, startY) => send("drag-window-to", screenX, screenY, startX, startY),
+  dragWindowEnded: () => send("drag-window-ended"),
+  setMouseEventsEnabled: (value) => {
+    petMouseEventsEnabled = Boolean(value);
+    syncMouseEvents();
+  },
+  showContextMenu: () => send("show-context-menu"),
+  setStretchMode: (value) => send("set-stretch-mode", value),
+  setHuntingMode: (value) => send("set-hunting-mode", value),
+  shareCaptureOptions: (value) => invoke("share-capture-options", value),
+  shareCaptureStarted: () => invoke("share-capture-started"),
+  shareCaptureOverlayHide: () => invoke("share-capture-overlay-hide"),
+  shareVideoSave: (value) => invoke("share-video-save", value),
+  shareErrorDialog: (value) => invoke("share-error-dialog", value),
+  userNameGet: () => invoke("user-name-get"),
+  userNameSet: (value) => invoke("user-name-set", value),
+  onUserNameEdit: (callback) => on("user-name-edit", callback),
+  onUserNameChanged: (callback) => on("user-name-changed", callback),
+  catNameGet: () => invoke("cat-name-get"),
+  catNameSet: (value) => invoke("cat-name-set", value),
+  catNameVisibleSet: (value) => invoke("cat-name-visible-set", value),
+  onCatNameEdit: (callback) => on("cat-name-edit", callback),
+  onCatNameChanged: (callback) => on("cat-name-changed", callback),
+  fixedMessageGet: () => invoke("fixed-message-get"),
+  fixedMessageSet: (value) => invoke("fixed-message-set", value),
+  onFixedMessageEdit: (callback) => on("fixed-message-edit", callback),
+  onFixedMessageChanged: (callback) => on("fixed-message-changed", callback),
+  catNamePromptShown: () => invoke("cat-name-prompt-shown"),
+  taskCompleteSoundVolumeGet: () => invoke("task-complete-sound-volume-get"),
+  taskCompleteSoundVolumeSet: (value) => invoke("task-complete-sound-volume-set", value),
+  soundMutedGet: () => invoke("sound-muted-get"),
+  soundMutedSet: (value) => invoke("sound-muted-set", value),
+  patternGet: () => invoke("pattern-get"),
+  patternSet: (value) => send("pattern-set", value),
+  patternPresetsGet: () => invoke("pattern-presets-get"),
+  patternCustomPresetSave: (value) => invoke("pattern-custom-preset-save", value),
+  patternCustomPresetDelete: (value) => invoke("pattern-custom-preset-delete", value),
+  patternCustomPresetRename: (value) => invoke("pattern-custom-preset-rename", value),
+  patternCustomPresetsExport: (value) => invoke("pattern-custom-presets-export", value),
+  patternCustomPresetsImport: () => invoke("pattern-custom-presets-import"),
+  patternConfirmClearAll: (value) => invoke("pattern-confirm-clear-all", value),
+  patternConfirmDeletePreset: (value) => invoke("pattern-confirm-delete-preset", value),
+  patternConfirmDiscardChanges: (value) => invoke("pattern-confirm-discard-changes", value),
+  onPatternChanged: (callback) => on("pattern-changed", callback),
+  openPatternEditor: () => send("open-pattern-editor"),
+  openMappingEditor: () => send("open-mapping-editor"),
+  mappingLoad: () => invoke("mapping-load"),
+  mappingSave: (value) => invoke("mapping-save", value),
+  svgLoad: (value) => invoke("svg-load", value),
+  licenseActivate: (value) => invoke("license-activate", value),
+  licenseCurrent: () => invoke("license-current"),
+  openLandingPage: () => invoke("open-landing-page"),
+  openLicenseResetPage: () => invoke("open-license-reset-page"),
+  onLicenseError: (callback) => on("license-error", callback),
+  languageGet: () => invoke("language-get"),
+  languageSet: (value) => invoke("language-set", value),
+  onLanguageChanged: (callback) => on("language-changed", callback),
+});
+
+contextBridge.exposeInMainWorld("agentAPI", {
+  getState: () => invoke("agent-state-get"),
+  updateConfig: (values) => invoke("agent-config-set", values),
+  testConnection: () => invoke("agent-config-test"),
+  ask: (prompt) => invoke("agent-ask", prompt),
+  executeAction: (payload) => invoke("agent-action-execute", payload),
+  clearApprovals: () => invoke("agent-approvals-clear"),
+  setInteractionActive: (value) => {
+    agentInteractionActive = Boolean(value);
+    syncMouseEvents();
+  },
+});
+
+contextBridge.exposeInMainWorld("voiceAPI", {
+  onPlaySong: (callback) => on("play-song", callback),
+  onStopSong: (callback) => on("stop-song", callback),
+  onVoiceHeard: (callback) => on("voice-heard", callback),
+  startListening: () => send("voice-start-listening"),
+});
