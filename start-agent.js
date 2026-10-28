@@ -1,9 +1,8 @@
 "use strict";
 
-// The legacy voice listener is a Windows PowerShell process. On macOS it
-// should fail quietly instead of emitting an unhandled spawn error that makes
-// the cat look frozen. Text chat and the rest of the desktop pet do not depend
-// on that listener.
+const { app, BrowserWindow, screen } = require("electron");
+const path = require("path");
+
 if (process.platform === "darwin") {
   const childProcess = require("child_process");
   const nativeSpawn = childProcess.spawn;
@@ -15,8 +14,49 @@ if (process.platform === "darwin") {
   };
 }
 
-// Load the agent sidecar before the existing desktop-pet process registers its
-// own windows and IPC handlers. The agent communicates with the renderer over
-// a loopback-only RPC endpoint so the existing minified preload can stay intact.
+// Load sidecar & main desktop-pet logic
 require("./agent-main");
 require("./main.js");
+
+app.whenReady().then(() => {
+  setTimeout(() => {
+    try {
+      let editorWin = null;
+      if (process.env.OPEN_EDITOR === "1") {
+        // Create editor window if explicitly requested
+        editorWin = new BrowserWindow({
+          width: 900,
+          height: 720,
+          title: "Comnyang Dev - Desktop Companion & Pattern Editor",
+          backgroundColor: "#1e1e1e",
+          icon: path.join(__dirname, "assets", "comnyang-logo.png"),
+          webPreferences: {
+            preload: path.join(__dirname, "preload.js"),
+            contextIsolation: true,
+            nodeIntegration: false,
+          },
+        });
+        editorWin.setMenu(null);
+        editorWin.loadFile(path.join(__dirname, "editor", "index.html"));
+        editorWin.show();
+        editorWin.focus();
+        editorWin.moveTop();
+        console.log("[Comnyang] Editor window opened!");
+      }
+
+      // Also ensure the desktop pet has taskbar enabled and is centered
+      const windows = BrowserWindow.getAllWindows();
+      for (const win of windows) {
+        if (!win.isDestroyed() && win !== editorWin) {
+          try { win.setSkipTaskbar(false); } catch (_) {}
+          try { win.show(); } catch (_) {}
+          try { win.focus(); } catch (_) {}
+          try { win.setAlwaysOnTop(true, "screen-saver"); } catch (_) {}
+          try { win.webContents.send("cat-open-chat"); } catch (_) {}
+        }
+      }
+    } catch (e) {
+      console.error("[start-agent] failed to open editor:", e);
+    }
+  }, 1000);
+});

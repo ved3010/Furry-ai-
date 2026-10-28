@@ -49,3 +49,9 @@ out/
 
 # Scratch and temporary testing files
 scratch/
+
+# Classroom tokens and sensitive cache
+classroom-token.json
+classroom-cache.json
+credentials.json
+token.json
