@@ -31,6 +31,8 @@ function harness(existingFiles = new Map(), options = {}) {
         net: { fetch: options.fetch || (() => assert.fail("unexpected provider request")) },
       };
       if (name === "./agent-shortcuts") return require("../agent-shortcuts");
+      if (name === "./app-launcher") return require("../app-launcher");
+      if (name === "./google-classroom") return require("../google-classroom");
       if (name === "./agent-music") return {
         ...require("../agent-music"), executeMusicAction: async (action) => { calls.push(["music", action]); return { ok: true, message: "Test player state" }; },
       };

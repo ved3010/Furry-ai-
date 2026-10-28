@@ -10,9 +10,10 @@ const HELP = [
   "• pause music on Spotify / resume music on Apple Music",
   "• next song on Spotify / what is playing on Spotify",
   "• play <Spotify track link> (desktop Spotify)",
+  "• check Google Classroom / sync assignments",
   "• list tasks / add task: <title> / list reminders",
   "• remember <key>: <value>",
-  "Opening an app, link, or local path happens immediately. Song names open search results; choose a result to play. Playback controls still need Allow, the desktop app, and macOS Automation permission. I cannot see your screen, access your accounts, or submit applications automatically.",
+  "Opening an app, link, or local path happens immediately. Song names open search results; choose a result to play. Playback controls still need Allow, the desktop app, and macOS Automation permission. Google Classroom assignments can be synced into tasks directly when connected.",
 ].join("\n");
 
 const APPS = new Map([
@@ -20,8 +21,14 @@ const APPS = new Map([
   ["firefox", "Firefox"], ["brave", "Brave Browser"], ["calculator", "Calculator"],
   ["notes", "Notes"], ["finder", "Finder"], ["terminal", "Terminal"], ["calendar", "Calendar"],
   ["mail", "Mail"], ["messages", "Messages"], ["music", "Music"], ["apple music", "Music"],
-  ["spotify", "Spotify"], ["visual studio code", "Visual Studio Code"],
-  ["unstop smarthire", "Unstop SmartHire"],
+  ["spotify", "Spotify"], ["visual studio code", "Visual Studio Code"], ["vs code", "Visual Studio Code"],
+  ["vscode", "Visual Studio Code"], ["code", "Visual Studio Code"],
+  ["unstop smarthire", "Unstop SmartHire"], ["youtube", "YouTube"],
+  ["leetcode", "LeetCode"], ["lead code", "LeetCode"], ["leadcode", "LeetCode"],
+  ["discord", "Discord"], ["whatsapp", "WhatsApp"],
+  ["classroom", "Google Classroom"], ["google classroom", "Google Classroom"],
+  ["claude", "Claude"], ["chatgpt", "ChatGPT"], ["github", "GitHub"],
+  ["notion", "Notion"], ["netflix", "Netflix"],
 ]);
 
 const result = (reply, action = null) => ({ reply, action });
@@ -50,6 +57,13 @@ function inferShortcut(message) {
     return result("", { type: "list_tasks" });
   }
   if (/^(?:list|show)(?: my)? reminders[?.!]*$/i.test(text)) return result("", { type: "list_reminders" });
+
+  const classroomMatch =
+    /(?:check|get|fetch|show|read|sync|list|save|import)\b.*?\b(?:google\s+classroom|classroom)\b|\b(?:google\s+classroom|classroom)\b.*?\b(?:assignments?|tasks?|homework|deadlines?|details|check|sync|subjects?|courses?)\b|\bhow many (?:subjects?|courses?|assignments?)\b.*?\b(?:google\s+classroom|classroom)\b/i.test(text);
+  if (classroomMatch && !/^(?:open|launch|start|visit|go to)\b/i.test(text)) {
+    return result("", { type: "check_classroom" });
+  }
+
   let match = text.match(/^(?:add (?:a )?task|todo)\s*:\s*(.+)$/i);
   if (match) return result("", { type: "create_task", title: match[1].trim() });
   match = text.match(/^remember\s+([^:\n]{1,80}):\s*(.+)$/i);

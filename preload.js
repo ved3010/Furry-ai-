@@ -57,6 +57,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onUpdateState: (callback) => on("update-state", callback),
   onTaskCompleteSoundVolume: (callback) => on("task-complete-sound-volume", callback),
   onSoundMuted: (callback) => on("sound-muted", callback),
+  onGentleCheckInShowPaw: (callback) => on("gentle-checkin-show-paw", callback),
+  onGentleCheckInShowPrompt: (callback) => on("gentle-checkin-show-prompt", callback),
+  onGentleCheckInHide: (callback) => on("gentle-checkin-hide", callback),
+  onGentleCheckInPurr: (callback) => on("gentle-checkin-purr", callback),
+  gentleCheckInRespond: (action) => send("gentle-checkin-respond", action),
+  toggleThinkingMode: (minutes) => invoke("thinking-mode-toggle", minutes),
+  getThinkingMode: () => invoke("thinking-mode-get"),
   updateCheck: () => invoke("update-check"),
   updateDownload: () => invoke("update-download"),
   updateInstall: () => invoke("update-install"),
@@ -137,5 +144,14 @@ contextBridge.exposeInMainWorld("voiceAPI", {
   onPlaySong: (callback) => on("play-song", callback),
   onStopSong: (callback) => on("stop-song", callback),
   onVoiceHeard: (callback) => on("voice-heard", callback),
+  onStartRecord: (callback) => on("voice-start-record", callback),
   startListening: () => send("voice-start-listening"),
+  transcribeAudio: (buffer, mimeType) => invoke("voice-transcribe-audio", buffer, mimeType),
+});
+
+contextBridge.exposeInMainWorld("classroomAPI", {
+  isConnected: () => invoke("classroom-is-connected"),
+  connect: () => invoke("classroom-connect"),
+  disconnect: () => invoke("classroom-disconnect"),
+  fetchAssignments: () => invoke("classroom-fetch-assignments"),
 });

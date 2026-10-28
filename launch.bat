@@ -1,6 +1,5 @@
 @echo off
-title Comnyang Desktop Companion
+title Furry AI Cat Companion
 cd /d "%~dp0"
-echo Starting Comnyang Desktop Companion...
-start "" "comnyang_extracted\Comnyang Dev.exe"
-
+echo Starting Furry AI Cat Companion...
+call npm.cmd start

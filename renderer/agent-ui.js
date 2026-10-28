@@ -587,7 +587,12 @@
     }
   });
 
-  window.electronAPI?.onCatOpenChat?.(() => showBar(true));
+  window.electronAPI?.onCatOpenChat?.(() => {
+    showBar(true);
+    if (!responseText.textContent && !busy) {
+      showResponse("I'm here! What tasks do you have on your plate? Tell me your tasks and I'll arrange them by priority for you! 🐾", { status: "Priority Planner" });
+    }
+  });
   window.addEventListener("cat-toggle-chat", () => {
     if (panel.hidden) {
       showBar(true);

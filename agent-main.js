@@ -8,6 +8,8 @@ const path = require("path");
 const { spawn, execFile } = require("child_process");
 const { inferShortcut } = require("./agent-shortcuts");
 const { normalizeMusicAction, executeMusicAction } = require("./agent-music");
+const appLauncher = require("./app-launcher");
+const googleClassroom = require("./google-classroom");
 const {
   app,
   BrowserWindow,
@@ -273,6 +275,7 @@ function buildSystemPrompt() {
   const taskList = tasks.length
     ? tasks.filter((item) => !item.completed).slice(-MAX_CONTEXT_TASKS).map((item) => `${normalizeText(item.id, 120)}: ${normalizeText(item.title, 180)}`).join("\n")
     : "(none)";
+  const classroomSummary = typeof googleClassroom.getClassroomSummaryText === "function" ? googleClassroom.getClassroomSummaryText() : "";
 
   return [
     `You are ${catName}, a warm but concise personal desktop cat assistant.`,
@@ -281,13 +284,15 @@ function buildSystemPrompt() {
     "You can chat, maintain lightweight memories and tasks, create reminders, and propose safe computer actions.",
     "Understand natural-language questions, follow the conversation, and answer directly before offering optional next steps.",
     "Help with planning, studying, writing, coding explanations, decisions, and breaking work into concrete steps. Ask one concise question when essential details are missing instead of guessing.",
+    "When the user shares or tells you their tasks or to-do list, arrange and prioritize them clearly (e.g. by Urgent & Important, High / Medium / Low priority, estimated effort, and logical sequence). Explain why each task is prioritized in that order, and suggest a clear, actionable first step to get started without feeling overwhelmed.",
     "Use stored memories and open tasks only when relevant. Save or change personal data only when the user clearly asks you to do so.",
     "Be warm and human, but do not add cat sounds to every answer. Keep simple answers short and make complex answers well-structured.",
-    "You cannot see the screen, read arbitrary files, browse live results, access accounts, or submit applications. Never invent access, live listings, or completed work.",
+    "You cannot see the screen or read arbitrary local files. However, Google Classroom IS integrated via OAuth with live access to courses and assignments. Use the Google Classroom details provided below to answer questions about subjects, courses, and assignments accurately. When the user asks to check, sync, fetch, or save assignments or deadlines from Google Classroom, propose the action: {\"type\": \"check_classroom\"}.",
     "Unstop browsing and music searches are browser shortcuts, not linked accounts. Search results do not mean a song is playing.",
     "Never claim that an action happened unless the app confirms it.",
     "Return ONLY valid JSON with this exact top-level shape: {\"reply\":\"string\",\"action\":null|{...}}. Escape newlines and quotes correctly. Do not wrap the JSON in Markdown fences.",
     "Allowed actions:",
+    '- check_classroom: {type: "check_classroom"}',
     '- create_reminder: {type, time: "HH:MM", message, repeat: "none"|"daily"|"weekdays"|"weekends"|"custom", days: [0-6]}',
     '- remember: {type, key, value}',
     '- forget_memory: {type, key}',
@@ -308,6 +313,7 @@ function buildSystemPrompt() {
     `Current reminders:\n${reminderList}`,
     `Stored memories:\n${memoryList}`,
     `Open tasks:\n${taskList}`,
+    ...(classroomSummary ? [classroomSummary] : []),
   ].join("\n");
 }
 
@@ -525,6 +531,7 @@ function normalizeAction(value) {
     const id = normalizeText(value.id, 120);
     return id ? { type, id } : null;
   }
+  if (type === "check_classroom" || type === "sync_classroom") return { type: "check_classroom" };
   if (type === "list_reminders" || type === "list_tasks") return { type };
   if (type === "open_url") {
     try {
@@ -675,6 +682,7 @@ function hasExplicitOpenIntent(message) {
 
 function actionDescription(action) {
   if (!action) return "";
+  if (action.type === "check_classroom") return "Check Google Classroom for assignments";
   if (action.type === "music_control") return `${action.command.replace(/_/g, " ")} in ${action.player === "spotify" ? "Spotify" : "Music"}${action.uri ? `: ${action.uri}` : ""} (macOS may ask for Automation permission)`;
   if (action.type === "create_reminder") {
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -727,6 +735,152 @@ function buildActionResultReply(userMessage, reply, action, result) {
   return response;
 }
 
+async function handleCheckClassroom(userMessage = "") {
+  loadState();
+  if (!googleClassroom.isConnected()) {
+    return {
+      ok: true,
+      message: "Google Classroom is not connected yet. Click Settings ⚙️ to connect, or run 'node connect-classroom.js' in your terminal.",
+    };
+  }
+
+  try {
+    const res = await googleClassroom.fetchAssignments();
+    if (!res.ok) {
+      if (res.error === "AUTH_EXPIRED") {
+        return {
+          ok: false,
+          message: "Google Classroom authorization has expired. Please reconnect in Settings or run 'node connect-classroom.js'.",
+        };
+      }
+      return {
+        ok: false,
+        message: `Could not fetch assignments from Google Classroom: ${res.message || res.error}`,
+      };
+    }
+
+    const courses = res.courses || [];
+    const pendingAssignments = res.pendingAssignments || res.assignments || [];
+    const submittedAssignments = res.submittedAssignments || [];
+    const allAssignments = res.allAssignments || [];
+    const totalCount = res.totalCount || allAssignments.length;
+
+    let addedCount = 0;
+    const now = new Date().toISOString();
+    for (const a of pendingAssignments) {
+      const taskTitle = `[Classroom] ${a.courseName}: ${a.title}${a.dueDateFormatted ? ` (${a.dueDateFormatted})` : ""}`;
+      const alreadyExists = tasks.some(
+        (t) => t.title === taskTitle || t.classroomId === a.id || (t.title.includes(a.title) && !t.completed)
+      );
+      if (!alreadyExists) {
+        tasks.push({
+          id: `task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+          title: taskTitle,
+          classroomId: a.id,
+          link: a.link,
+          dueDate: a.dueDate,
+          completed: false,
+          createdAt: now,
+        });
+        addedCount += 1;
+      }
+    }
+    if (addedCount > 0) {
+      saveTasks();
+    }
+
+    const query = String(userMessage || "").toLowerCase();
+
+    // 1. If user specifically asks about subjects/courses
+    const isSubjectQuery = /\b(subject|subjects|course|courses|class|classes)\b/i.test(query)
+      && !/\b(assignment|assignments|homework|task|tasks|deadline|deadlines)\b/i.test(query);
+
+    if (isSubjectQuery) {
+      if (courses.length === 0) {
+        return {
+          ok: true,
+          message: "You don't have any active subjects or courses enrolled in Google Classroom right now.",
+        };
+      }
+      const courseListStr = courses.map((c, i) => {
+        const details = [c.subject, c.section ? `Sec ${c.section}` : ""].filter(Boolean).join(", ");
+        return `${i + 1}. **${c.name}**${details ? ` (${details})` : ""}`;
+      }).join("\n");
+      return {
+        ok: true,
+        message: `You have **${courses.length} active subject${courses.length > 1 ? "s" : ""}** in Google Classroom:\n\n${courseListStr}\n\nAcross your subjects, there are ${totalCount} assignments (${pendingAssignments.length} pending, ${submittedAssignments.length} submitted).`,
+      };
+    }
+
+    // 2. If user asks "how many assignments" or asks to check "all" assignments / overview
+    const isAllOrCountQuery = /\b(all|how many|total|count|overview|list all|every|submitted)\b/i.test(query);
+
+    if (isAllOrCountQuery) {
+      const lines = [];
+      lines.push(`You have **${totalCount} assignment${totalCount === 1 ? "" : "s"}** in total in Google Classroom (${courses.length} subject${courses.length === 1 ? "" : "s"}):\n`);
+
+      if (pendingAssignments.length > 0) {
+        lines.push(`📝 **Pending (${pendingAssignments.length}):**`);
+        pendingAssignments.forEach((a, i) => {
+          const status = a.isOverdue ? "⚠️ Overdue" : a.dueDateFormatted === "No due date" ? "No due date" : `Due ${a.dueDateFormatted}`;
+          lines.push(`  ${i + 1}. **${a.title}** (${a.courseName}) — ${status}`);
+        });
+      } else {
+        lines.push(`🎉 **Pending:** None! All caught up.`);
+      }
+
+      if (submittedAssignments.length > 0) {
+        lines.push(`\n✅ **Completed / Submitted (${submittedAssignments.length}):**`);
+        submittedAssignments.slice(0, 5).forEach((a, i) => {
+          lines.push(`  ${i + 1}. **${a.title}** (${a.courseName}) — Turned in`);
+        });
+        if (submittedAssignments.length > 5) {
+          lines.push(`  ...and ${submittedAssignments.length - 5} more turned in`);
+        }
+      }
+
+      if (addedCount > 0) {
+        lines.push(`\n🐾 *Saved ${addedCount} pending assignment${addedCount > 1 ? "s" : ""} to your tasks list.*`);
+      }
+
+      return {
+        ok: true,
+        message: lines.join("\n"),
+      };
+    }
+
+    // 3. Default check / sync assignments query
+    if (pendingAssignments.length === 0) {
+      const courseSummary = courses.length > 0 ? `across your ${courses.length} subject${courses.length > 1 ? "s" : ""} (${courses.map((c) => c.name).join(", ")})` : "";
+      return {
+        ok: true,
+        message: `I checked your Google Classroom! 🐾 You're all caught up—you have **0 pending assignments** right now${courseSummary ? ` ${courseSummary}` : ""} (${submittedAssignments.length} submitted).`,
+      };
+    }
+
+    const items = pendingAssignments.map((a, i) => {
+      const status = a.isOverdue ? "⚠️ Overdue" : a.dueDateFormatted === "No due date" ? "No due date" : `Due ${a.dueDateFormatted}`;
+      return `${i + 1}. **${a.title}** (${a.courseName}) — ${status}`;
+    }).join("\n");
+
+    const savedSummary = addedCount > 0
+      ? `I've saved ${addedCount} assignment${addedCount > 1 ? "s" : ""} to your tasks list!`
+      : `All pending assignments are in your tasks list.`;
+
+    const extraNote = submittedAssignments.length > 0 ? `\n(You also have ${submittedAssignments.length} already submitted.)` : "";
+
+    return {
+      ok: true,
+      message: `Found **${pendingAssignments.length} pending assignment${pendingAssignments.length > 1 ? "s" : ""}** in Google Classroom:\n\n${items}\n${extraNote}\n\n🐾 ${savedSummary}`,
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      message: `Failed to check Google Classroom: ${err.message}`,
+    };
+  }
+}
+
 async function askModel(prompt) {
   loadState();
   const userMessage = normalizeText(prompt, 2_000);
@@ -736,6 +890,10 @@ async function askModel(prompt) {
   const shortcut = inferShortcut(userMessage);
   if (shortcut) {
     const action = normalizeAction(shortcut.action);
+    if (action?.type === "check_classroom") {
+      const classroomResult = await handleCheckClassroom(userMessage);
+      return buildActionResultReply(userMessage, shortcut.reply, action, classroomResult);
+    }
     if (isAutoOpenAction(action)) {
       const result = await executeOpenAction(action);
       return buildActionResultReply(userMessage, shortcut.reply, action, result);
@@ -775,6 +933,10 @@ async function askModel(prompt) {
   const parsed = parseJsonReply(rawContent);
   const reply = normalizeText(parsed?.reply || rawContent, 2_000) || "I didn't get a response from the model.";
   const action = normalizeAction(parsed?.action);
+  if (action?.type === "check_classroom") {
+    const classroomResult = await handleCheckClassroom(userMessage);
+    return buildActionResultReply(userMessage, reply, action, classroomResult);
+  }
   const internalResult = applyInternalAction(action);
   if (isAutoOpenAction(action) && hasExplicitOpenIntent(userMessage)) {
     const result = await executeOpenAction(action);
@@ -819,8 +981,8 @@ async function executeOpenAction(normalized) {
   ]);
   if (normalized.type === "open_url") {
     try {
-      await bounded(() => shell.openExternal(normalized.url));
-      return { ok: true, message: "Opened the link in your browser." };
+      await bounded(() => appLauncher.openInBrave(normalized.url, shell));
+      return { ok: true, message: "Opened the link in Brave." };
     } catch (error) {
       if (error?.code === "OPEN_TIMEOUT") return { ok: false, reason: "open-timeout", message: "The browser took too long to open the link. Check your default browser and try again." };
       return { ok: false, reason: "open-failed", message: "The browser could not open the link. Check your default browser and try again." };
@@ -835,7 +997,20 @@ async function executeOpenAction(normalized) {
         });
       });
     }
-    return { ok: false, reason: "unsupported-platform", message: "App launching by name is currently supported on macOS." };
+    try {
+      const result = await bounded(() => appLauncher.openTarget(normalized.name, shell));
+      if (result.ok) {
+        if (result.mode === "app") {
+          return { ok: true, message: `Opened ${result.appName || result.target}.` };
+        } else {
+          return { ok: true, message: `Opened ${result.target} in Brave.` };
+        }
+      }
+      return { ok: false, reason: "open-failed", message: `Could not open ${normalized.name}.` };
+    } catch (error) {
+      if (error?.code === "OPEN_TIMEOUT") return { ok: false, reason: "open-timeout", message: "Opening the target took too long." };
+      return { ok: false, reason: "open-failed", message: `Could not open ${normalized.name}: ${error?.message || error}` };
+    }
   }
   if (normalized.type === "open_path") {
     const target = expandUserPath(normalized.path);
