@@ -603,3 +603,94 @@ test("stuck-detector: markJustThinking doubles inactivity threshold up to 4 time
   );
   assert.equal(stuckDetector.getPatienceCount(), 0);
 });
+
+test("stuck-detector: User solving questions (LeetCode, HackerRank, Codeforces, quizzes) enters non-disturb thinking state", async (t) => {
+  stuckDetector.stopManualModes();
+  stuckDetector.toggleDemoMode(false);
+  const now = Date.now();
+
+  // Test question solving detection
+  assert.equal(stuckDetector.isQuestionSolvingContext("chrome.exe", "Two Sum - LeetCode"), true);
+  assert.equal(stuckDetector.isQuestionSolvingContext("msedge.exe", "Solve Challenge - HackerRank"), true);
+  assert.equal(stuckDetector.isQuestionSolvingContext("brave.exe", "Problem 1234A - Codeforces"), true);
+  assert.equal(stuckDetector.isQuestionSolvingContext("chrome.exe", "Midterm Exam Quiz - Canvas"), true);
+
+  // Even if idle for 10 minutes with frequent window switches (normally stuck/maybe_stuck conditions),
+  // solving questions must evaluate to 'thinking' (non-disturb) and NEVER stuck!
+  stuckDetector._setTestState({
+    currentState: "active",
+    currentAppType: "work app",
+    currentAppName: "chrome.exe",
+    isCurrentWindowWatching: false,
+    isCurrentWindowSolvingQuestions: true,
+    lastKeyTime: now - 10 * 60 * 1000,
+    lastActivityTime: now - 10 * 60 * 1000,
+    windowSwitches: [now - 90000, now - 80000, now - 70000, now - 60000, now - 50000, now - 40000],
+  });
+  stuckDetector._evaluateState();
+
+  assert.equal(
+    stuckDetector.getState(),
+    "thinking",
+    "Solving questions context must set state to thinking so user is never disturbed"
+  );
+
+  // Reset
+  stuckDetector._setTestState({ isCurrentWindowSolvingQuestions: false });
+  stuckDetector.recordKeyActivity();
+  assert.equal(stuckDetector.getState(), "active");
+});
+
+test("stuck-detector: Watching videos or lectures (YouTube, Coursera, NPTEL) prevents disturbance", async (t) => {
+  stuckDetector.stopManualModes();
+  stuckDetector.toggleDemoMode(false);
+  const now = Date.now();
+
+  assert.equal(stuckDetector.isWatchingContext("chrome.exe", "CS50 Lecture 1 - YouTube - Google Chrome"), true);
+  assert.equal(stuckDetector.isWatchingContext("msedge.exe", "Deep Learning Specialization - Coursera"), true);
+  assert.equal(stuckDetector.isWatchingContext("brave.exe", "Data Structures Lecture 10 - NPTEL"), true);
+  assert.equal(stuckDetector.isWatchingContext("vlc.exe", "Lecture_Recording.mp4"), true);
+
+  // Under inactive conditions, watching context evaluates to watching and blocks stuck
+  stuckDetector._setTestState({
+    currentState: "active",
+    currentAppType: "other",
+    currentAppName: "chrome.exe",
+    isCurrentWindowWatching: true,
+    isCurrentWindowSolvingQuestions: false,
+    lastKeyTime: now - 15 * 60 * 1000,
+    lastActivityTime: now - 15 * 60 * 1000,
+  });
+  stuckDetector._evaluateState();
+
+  assert.equal(
+    stuckDetector.getState(),
+    "watching",
+    "Video/lecture watching context must set state to watching so user is never disturbed"
+  );
+
+  // Reset
+  stuckDetector._setTestState({ isCurrentWindowWatching: false });
+  stuckDetector.recordKeyActivity();
+});
+
+test("stuck-detector: Active work (typing/mouse activity) keeps state active and prevents disturbance", async (t) => {
+  stuckDetector.stopManualModes();
+  stuckDetector.toggleDemoMode(false);
+
+  stuckDetector._setTestState({
+    currentState: "active",
+    currentAppType: "work app",
+    currentAppName: "Code.exe",
+    isCurrentWindowWatching: false,
+    isCurrentWindowSolvingQuestions: false,
+  });
+
+  stuckDetector.recordKeyActivity();
+  stuckDetector._evaluateState();
+  assert.equal(stuckDetector.getState(), "active", "Active typing must keep state as active");
+
+  stuckDetector.recordOtherActivity();
+  stuckDetector._evaluateState();
+  assert.equal(stuckDetector.getState(), "active", "Mouse/other work activity must keep state as active");
+});

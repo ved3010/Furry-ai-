@@ -62,6 +62,7 @@ let patienceMultiplier = 1; // 1, 2, 4, 8, 16
 let currentAppName = "";
 let currentAppType = "other"; // 'work app' | 'other'
 let isCurrentWindowWatching = false;
+let isCurrentWindowSolvingQuestions = false;
 let currentBounds = null;
 let lastWindowKey = null;
 let windowSwitches = []; // Array of timestamps
@@ -243,7 +244,12 @@ function isBrowserOrMediaApp(appName, appPath) {
     name.includes("vlc") ||
     name.includes("zoom") ||
     name.includes("teams") ||
-    name.includes("youtube")
+    name.includes("youtube") ||
+    name.includes("wmplayer") ||
+    name.includes("mpv") ||
+    name.includes("potplayer") ||
+    name.includes("kmplayer") ||
+    name.includes("netflix")
   );
 }
 
@@ -253,12 +259,10 @@ function isBrowserOrMediaApp(appName, appPath) {
  * 
  * Rules:
  * (1) Priority order: if the window is a work app (Google Docs, Notion, PDF, Word,
- *     IDE, Notepad), it is NOT watching, even if the title contains 'lecture', 'Meet' or 'Teams'.
- * (2) Use video keywords only when the app is a browser or a media/meeting app
- *     (chrome, edge, firefox, vlc, zoom, teams, brave, youtube PWA). Match 'Google Meet' and 'Microsoft Teams'
- *     as whole phrases, not the bare words 'Meet' or 'Teams'.
- * (3) The fullscreen rule must compare window bounds to the full display bounds
- *     (screen.getAllDisplays().bounds, not workArea), so a normal maximized window is NOT treated as fullscreen.
+ *     IDE, Notepad), it is NOT watching, unless the title explicitly indicates a video/lecture site
+ *     (e.g., YouTube, Coursera, Udemy, etc.).
+ * (2) Use video keywords only when the app is a browser or a media/meeting app.
+ * (3) The fullscreen rule compares window bounds to the full display bounds.
  * 
  * @param {string} appName - Process name
  * @param {string} windowTitle - Window title (in memory only)
@@ -267,42 +271,66 @@ function isBrowserOrMediaApp(appName, appPath) {
  * @returns {boolean}
  */
 function isWatchingContext(appName, windowTitle, bounds, appPath) {
-  // (1) Priority order: If the window is a work app, it is NOT watching,
-  // even if the title contains 'lecture', 'Meet', or 'Teams'.
-  if (classifyApp(appName, windowTitle) === "work app") {
+  const name = `${appName || ""} ${appPath || ""}`.toLowerCase();
+  const title = String(windowTitle || "").toLowerCase();
+
+  // If the title explicitly belongs to video/lecture platforms, it IS watching (even if code words appear in the title)
+  const isExplicitVideoPlatform =
+    title.includes("youtube") ||
+    title.includes("coursera") ||
+    title.includes("nptel") ||
+    title.includes("udemy") ||
+    title.includes("edx") ||
+    title.includes("khan academy") ||
+    title.includes("netflix") ||
+    title.includes("prime video") ||
+    title.includes("primevideo") ||
+    title.includes("hotstar") ||
+    title.includes("disney") ||
+    title.includes("hulu") ||
+    title.includes("twitch") ||
+    name.includes("youtube") ||
+    name.includes("vlc") ||
+    name.includes("zoom");
+
+  if (!isExplicitVideoPlatform && classifyApp(appName, windowTitle) === "work app") {
     return false;
   }
 
-  // (3) Fullscreen rule: If a non-work window covers the full display bounds,
+  // Fullscreen rule: If a non-work window covers the full display bounds,
   // it is treated as watching (e.g. video in true fullscreen mode).
-  // A normal maximized window is NOT treated as fullscreen.
   if (isWindowCoveringFullDisplay(bounds)) {
     return true;
   }
 
-  // (2) Use video keywords only when the app is a browser, PWA, or media/meeting app
+  // Use video keywords only when the app is a browser, PWA, or media/meeting app
   if (!isBrowserOrMediaApp(appName, appPath)) {
     return false;
   }
 
-  const name = `${appName || ""} ${appPath || ""}`.toLowerCase();
-  const title = String(windowTitle || "").toLowerCase();
-
-  // If the application itself is YouTube (PWA, desktop shortcut, or process)
   if (name.includes("youtube")) {
     return true;
   }
 
   // Match 'Google Meet' and 'Microsoft Teams' as whole phrases, not bare words 'Meet' or 'Teams'
   const isVideoOrMeeting =
-    title.includes("youtube") ||
+    isExplicitVideoPlatform ||
     title.includes("google meet") ||
     title.includes("microsoft teams") ||
-    title.includes("coursera") ||
-    title.includes("nptel") ||
-    title.includes("udemy") ||
-    title.includes("edx") ||
-    title.includes("khan academy") ||
+    title.includes("canvas") ||
+    title.includes("blackboard") ||
+    title.includes("moodle") ||
+    title.includes("panopto") ||
+    title.includes("kaltura") ||
+    title.includes("loom") ||
+    title.includes("ted.com") ||
+    title.includes("ted talks") ||
+    title.includes("skillshare") ||
+    title.includes("pluralsight") ||
+    title.includes("linkedin learning") ||
+    title.includes("vimeo") ||
+    title.includes("bilibili") ||
+    title.includes("dailymotion") ||
     title.includes("lecture") ||
     title.includes("webinar") ||
     title.includes("tutorial") ||
@@ -310,9 +338,52 @@ function isWatchingContext(appName, windowTitle, bounds, appPath) {
     name.includes("zoom") ||
     title.includes("vlc") ||
     name.includes("vlc") ||
-    name.includes("teams"); // Microsoft Teams desktop app
+    name.includes("teams");
 
   return isVideoOrMeeting;
+}
+
+/**
+ * Detects if the current active window represents solving questions,
+ * competitive programming, or quiz/exam contexts.
+ * In memory only - never stores, logs, or transmits windowTitle.
+ * 
+ * @param {string} appName - Process name
+ * @param {string} windowTitle - Window title (in memory only)
+ * @returns {boolean}
+ */
+function isQuestionSolvingContext(appName, windowTitle) {
+  const name = String(appName || "").toLowerCase();
+  const title = String(windowTitle || "").toLowerCase();
+
+  const isPlatform =
+    /\b(leetcode|hackerrank|codeforces|kaggle|codechef|geeksforgeeks|neetcode|atcoder|codewars|hackerearth|interviewbit|projecteuler|spoj|topcoder|exercism)\b/i.test(name) ||
+    title.includes("leetcode") ||
+    title.includes("hackerrank") ||
+    title.includes("codeforces") ||
+    title.includes("kaggle") ||
+    title.includes("codechef") ||
+    title.includes("geeksforgeeks") ||
+    title.includes("neetcode") ||
+    title.includes("atcoder") ||
+    title.includes("codewars") ||
+    title.includes("hackerearth") ||
+    title.includes("interviewbit") ||
+    title.includes("project euler") ||
+    title.includes("spoj") ||
+    title.includes("topcoder") ||
+    title.includes("exercism");
+
+  if (isPlatform) return true;
+
+  const isQuestionOrQuiz =
+    title.includes("quiz") ||
+    title.includes("exam") ||
+    title.includes("contest") ||
+    title.includes("assessment") ||
+    /\b(solve|solving|question|questions|problem|problems)\b/i.test(title);
+
+  return Boolean(isQuestionOrQuiz && (isBrowserOrMediaApp(appName) || /canvas|blackboard|moodle|exam|quiz/i.test(name)));
 }
 
 /**
@@ -467,6 +538,7 @@ async function pollActiveWindow() {
   currentAppType = classifyApp(appName, title);
   currentBounds = win.bounds || null;
   isCurrentWindowWatching = isWatchingContext(appName, title, currentBounds, appPath);
+  isCurrentWindowSolvingQuestions = isQuestionSolvingContext(appName, title);
 
   const didChange = evaluateState();
   if ((isWindowChanged || isFirstWindow) && !didChange) {
@@ -509,6 +581,10 @@ function evaluateState() {
   } else if (isCurrentWindowWatching && currentAppType !== "work app") {
     // Priority 2: Detected video or lecture context (never when in a work app)
     newState = STATES.WATCHING;
+  } else if (isCurrentWindowSolvingQuestions) {
+    // Priority 3: Solving questions (LeetCode, HackerRank, Codeforces, quizzes, exams)
+    // Deep focus solving questions - cat must NOT disturb the user
+    newState = STATES.THINKING;
   } else {
     // Normal stuck and maybe_stuck evaluation
     checkPatienceDayReset();
@@ -723,6 +799,7 @@ module.exports = {
   getCurrentAppName: () => currentAppName,
   classifyApp,
   isWatchingContext,
+  isQuestionSolvingContext,
   setWatchingMode,
   setThinkingMode,
   stopManualModes,
@@ -744,6 +821,7 @@ module.exports = {
     if (typeof opts.currentAppType !== "undefined") currentAppType = opts.currentAppType;
     if (typeof opts.currentAppName !== "undefined") currentAppName = opts.currentAppName;
     if (typeof opts.isCurrentWindowWatching !== "undefined") isCurrentWindowWatching = opts.isCurrentWindowWatching;
+    if (typeof opts.isCurrentWindowSolvingQuestions !== "undefined") isCurrentWindowSolvingQuestions = opts.isCurrentWindowSolvingQuestions;
     if (typeof opts.manualMode !== "undefined") manualMode = opts.manualMode;
     if (typeof opts.manualModeExpiresAt !== "undefined") manualModeExpiresAt = opts.manualModeExpiresAt;
     if (typeof opts.patienceMultiplier !== "undefined") patienceMultiplier = opts.patienceMultiplier;
