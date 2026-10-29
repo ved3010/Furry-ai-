@@ -118,6 +118,11 @@ class GentleCheckIn {
 
     // If the state returns to active, cancel the current stage
     if (newState === "active") {
+      // If the prompt is currently open with Yes/No buttons, moving mouse to hover/click the button
+      // triggers mouse activity that updates detector state to active. We must NOT close the prompt on mouse movement!
+      if (this.currentStage === STAGES.STAGE_PROMPT && meta.activityType === "mouse") {
+        return;
+      }
       this.cancelStage();
       return;
     }
@@ -147,28 +152,39 @@ class GentleCheckIn {
     }
   }
 
-  startPrompt() {
+  resetLimits() {
+    this.silenceUntil = 0;
+    this.silenceForRestOfDay = false;
+    this.lastCheckInTime = -1;
+    this.checkInsToday = 0;
+    this.consecutiveIgnoredCount = 0;
+  }
+
+  startPrompt(force = false) {
     this.checkDayReset();
-    if (this.isSilenced()) {
-      this.cancelStage();
-      return;
-    }
 
-    const currentState = this.stuckDetector?.getState?.();
-    if (currentState && currentState !== "maybe_stuck" && currentState !== "stuck") {
-      this.cancelStage();
-      return;
-    }
+    if (!force) {
+      if (this.isSilenced()) {
+        this.cancelStage();
+        return;
+      }
 
-    // Verify daily limits
-    if (this.checkInsToday >= MAX_CHECKINS_PER_DAY) {
-      this.cancelStage();
-      return;
-    }
+      const currentState = this.stuckDetector?.getState?.();
+      if (currentState && currentState !== "maybe_stuck" && currentState !== "stuck") {
+        this.cancelStage();
+        return;
+      }
 
-    if (this.lastCheckInTime >= 0 && this.now() - this.lastCheckInTime < MIN_INTERVAL_BETWEEN_CHECKINS_MS) {
-      this.cancelStage();
-      return;
+      // Verify daily limits
+      if (this.checkInsToday >= MAX_CHECKINS_PER_DAY) {
+        this.cancelStage();
+        return;
+      }
+
+      if (this.lastCheckInTime >= 0 && this.now() - this.lastCheckInTime < MIN_INTERVAL_BETWEEN_CHECKINS_MS) {
+        this.cancelStage();
+        return;
+      }
     }
 
     this.currentStage = STAGES.STAGE_PROMPT;
@@ -216,7 +232,12 @@ class GentleCheckIn {
   respondYes() {
     console.log("user accepted");
     this.consecutiveIgnoredCount = 0;
-    this.cancelStage();
+    this.clearTimers();
+    this.currentStage = STAGES.NONE;
+  }
+
+  respondYesPicked() {
+    this.respondYes();
   }
 
   respondNo() {
@@ -224,6 +245,18 @@ class GentleCheckIn {
     this.silenceUntil = this.now() + SILENCE_NOT_NOW_MS;
     this.consecutiveIgnoredCount = 0;
     this.cancelStage();
+  }
+
+  silenceFor(ms) {
+    const duration = Math.max(0, Number(ms) || 0);
+    this.silenceUntil = this.now() + duration;
+    this.consecutiveIgnoredCount = 0;
+    this.cancelStage();
+  }
+
+  respondNeedRest() {
+    // 60 minutes silence
+    this.silenceFor(60 * 60 * 1000);
   }
 
   // Compatibility aliases
@@ -333,6 +366,8 @@ module.exports = {
   respondNotNow: () => defaultInstance.respondNotNow(),
   respondJustThinking: () => defaultInstance.respondJustThinking(),
   respondFine: () => defaultInstance.respondFine(),
+  startPrompt: (force) => defaultInstance.startPrompt(force),
+  resetLimits: () => defaultInstance.resetLimits(),
   cancelStage: () => defaultInstance.cancelStage(),
   getStage: () => defaultInstance.getStage(),
   isSilenced: () => defaultInstance.isSilenced(),

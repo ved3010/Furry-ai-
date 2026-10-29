@@ -30,6 +30,8 @@ function harness(existingFiles = new Map(), options = {}) {
         shell: { openExternal: async (url) => { calls.push(["url", url]); }, openPath: async () => "" },
         net: { fetch: options.fetch || (() => assert.fail("unexpected provider request")) },
       };
+      if (name === "./tiny-step-ai") return require("../tiny-step-ai");
+      if (name === "./cat-energy") return require("../cat-energy");
       if (name === "./agent-shortcuts") return require("../agent-shortcuts");
       if (name === "./app-launcher") return require("../app-launcher");
       if (name === "./google-classroom") return require("../google-classroom");

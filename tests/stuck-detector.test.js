@@ -604,7 +604,7 @@ test("stuck-detector: markJustThinking doubles inactivity threshold up to 4 time
   assert.equal(stuckDetector.getPatienceCount(), 0);
 });
 
-test("stuck-detector: User solving questions (LeetCode, HackerRank, Codeforces, quizzes) enters non-disturb thinking state", async (t) => {
+test("stuck-detector: User solving questions (LeetCode, HackerRank, Codeforces, quizzes) gives 15 minutes before check-in", async (t) => {
   stuckDetector.stopManualModes();
   stuckDetector.toggleDemoMode(false);
   const now = Date.now();
@@ -615,8 +615,7 @@ test("stuck-detector: User solving questions (LeetCode, HackerRank, Codeforces, 
   assert.equal(stuckDetector.isQuestionSolvingContext("brave.exe", "Problem 1234A - Codeforces"), true);
   assert.equal(stuckDetector.isQuestionSolvingContext("chrome.exe", "Midterm Exam Quiz - Canvas"), true);
 
-  // Even if idle for 10 minutes with frequent window switches (normally stuck/maybe_stuck conditions),
-  // solving questions must evaluate to 'thinking' (non-disturb) and NEVER stuck!
+  // Case 1: At 10 minutes of inactivity while solving questions, user is NOT yet stuck (15-minute threshold)
   stuckDetector._setTestState({
     currentState: "active",
     currentAppType: "work app",
@@ -625,20 +624,41 @@ test("stuck-detector: User solving questions (LeetCode, HackerRank, Codeforces, 
     isCurrentWindowSolvingQuestions: true,
     lastKeyTime: now - 10 * 60 * 1000,
     lastActivityTime: now - 10 * 60 * 1000,
-    windowSwitches: [now - 90000, now - 80000, now - 70000, now - 60000, now - 50000, now - 40000],
+    windowSwitches: [],
   });
   stuckDetector._evaluateState();
 
   assert.equal(
     stuckDetector.getState(),
-    "thinking",
-    "Solving questions context must set state to thinking so user is never disturbed"
+    "active",
+    "At 10 minutes of question solving, state must remain active (15-min threshold)"
   );
+
+  // Case 2: At 16 minutes of no writing while solving questions, user is likely stuck -> maybe_stuck triggers check-in
+  stuckDetector._setTestState({
+    currentState: "active",
+    currentAppType: "work app",
+    currentAppName: "chrome.exe",
+    isCurrentWindowWatching: false,
+    isCurrentWindowSolvingQuestions: true,
+    lastKeyTime: now - 16 * 60 * 1000,
+    lastActivityTime: now - 16 * 60 * 1000,
+    windowSwitches: [],
+  });
+  stuckDetector._evaluateState();
+
+  assert.equal(
+    stuckDetector.getState(),
+    "maybe_stuck",
+    "At 16 minutes without writing in a question solving context, maybe_stuck should trigger check-in bubble"
+  );
+
+  // Case 3: When user resumes writing/typing, state returns to active immediately
+  stuckDetector.recordKeyActivity();
+  assert.equal(stuckDetector.getState(), "active", "Resuming writing immediately cancels stuck state");
 
   // Reset
   stuckDetector._setTestState({ isCurrentWindowSolvingQuestions: false });
-  stuckDetector.recordKeyActivity();
-  assert.equal(stuckDetector.getState(), "active");
 });
 
 test("stuck-detector: Watching videos or lectures (YouTube, Coursera, NPTEL) prevents disturbance", async (t) => {

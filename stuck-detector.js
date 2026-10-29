@@ -38,14 +38,17 @@ const STATES = {
 const WINDOW_SWITCH_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
 const NORMAL_MAYBE_STUCK_THRESHOLD_MS = 8 * 60 * 1000; // 8 minutes (no activity of any kind)
 const NORMAL_NO_KEY_THRESHOLD_MS = 5 * 60 * 1000; // 5 minutes (no keyboard activity)
-const DEMO_MAYBE_STUCK_THRESHOLD_MS = 15 * 1000; // 15 seconds in demo mode
+const NORMAL_QUESTION_STUCK_THRESHOLD_MS = 15 * 60 * 1000; // 15 minutes for solving questions (user will write at least something)
+const DEMO_MAYBE_STUCK_THRESHOLD_MS = 10 * 1000; // 10 seconds in demo mode (work apps)
 const DEMO_NO_KEY_THRESHOLD_MS = 10 * 1000; // 10 seconds in demo mode
+const DEMO_QUESTION_STUCK_THRESHOLD_MS = 15 * 1000; // 15 seconds in demo mode (solving questions)
 const MIN_SWITCHES_FOR_STUCK = 6;
 const POLL_INTERVAL_MS = 1000; // Poll active window every second
 
 let currentState = STATES.ACTIVE;
 let lastActivityTime = Date.now(); // Any input or window switch
 let lastKeyTime = Date.now(); // Keyboard events only (timestamp only)
+let lastActivitySource = "none"; // 'keyboard' | 'mouse' | 'none'
 let isDemoMode = false;
 
 // Manual focus modes
@@ -78,6 +81,7 @@ const stateListeners = new Set();
  * Record ONLY the timestamp (Date.now()). Never inspect, log, or store key content.
  */
 function recordKeyActivity() {
+  lastActivitySource = "keyboard";
   const now = Date.now();
   lastKeyTime = now;
   lastActivityTime = now;
@@ -88,6 +92,7 @@ function recordKeyActivity() {
  * Record non-keyboard activity timestamp (mouse, scroll, etc.).
  */
 function recordOtherActivity() {
+  lastActivitySource = "mouse";
   lastActivityTime = Date.now();
   evaluateState();
 }
@@ -579,26 +584,23 @@ function evaluateState() {
   } else if (manualMode === STATES.THINKING) {
     newState = STATES.THINKING;
   } else if (isCurrentWindowWatching && currentAppType !== "work app") {
-    // Priority 2: Detected video or lecture context (never when in a work app)
+    // Priority 2: Detected video or lecture context (never disturbed during videos/lectures)
     newState = STATES.WATCHING;
-  } else if (isCurrentWindowSolvingQuestions) {
-    // Priority 3: Solving questions (LeetCode, HackerRank, Codeforces, quizzes, exams)
-    // Deep focus solving questions - cat must NOT disturb the user
-    newState = STATES.THINKING;
   } else {
-    // Normal stuck and maybe_stuck evaluation
+    // Normal stuck and Question-solving stuck evaluation
     checkPatienceDayReset();
     const noActivityDuration = now - lastActivityTime;
     const noKeyDuration = now - lastKeyTime;
 
-    const baseMaybeStuckThreshold = isDemoMode
-      ? DEMO_MAYBE_STUCK_THRESHOLD_MS
-      : NORMAL_MAYBE_STUCK_THRESHOLD_MS;
+    // For solving questions, threshold is 15 minutes (25s in demo); for normal work apps, 8 minutes (15s in demo)
+    const baseMaybeStuckThreshold = isCurrentWindowSolvingQuestions
+      ? (isDemoMode ? DEMO_QUESTION_STUCK_THRESHOLD_MS : NORMAL_QUESTION_STUCK_THRESHOLD_MS)
+      : (isDemoMode ? DEMO_MAYBE_STUCK_THRESHOLD_MS : NORMAL_MAYBE_STUCK_THRESHOLD_MS);
     const maybeStuckThreshold = baseMaybeStuckThreshold * patienceMultiplier;
 
-    const noKeyThreshold = isDemoMode
-      ? DEMO_NO_KEY_THRESHOLD_MS
-      : NORMAL_NO_KEY_THRESHOLD_MS;
+    const noKeyThreshold = isCurrentWindowSolvingQuestions
+      ? (isDemoMode ? DEMO_QUESTION_STUCK_THRESHOLD_MS : NORMAL_QUESTION_STUCK_THRESHOLD_MS)
+      : (isDemoMode ? DEMO_NO_KEY_THRESHOLD_MS : NORMAL_NO_KEY_THRESHOLD_MS);
 
     const switchesIn2Min = getWindowSwitchesInLast2Minutes();
     const hasFrequentSwitches = switchesIn2Min.length >= MIN_SWITCHES_FOR_STUCK;
@@ -606,8 +608,10 @@ function evaluateState() {
     // Rule: stuck = 6+ window switches in 2 mins AND no keyboard activity for 5 mins (or 10s demo)
     const isStuck = hasFrequentSwitches && noKeyDuration >= noKeyThreshold;
 
-    // Rule: maybe_stuck = no activity of any kind for 8 mins in a work app
-    const isMaybeStuck = currentAppType === "work app" && noActivityDuration >= maybeStuckThreshold;
+    // Rule: maybe_stuck = no activity of any kind for 8 mins in work app (or 15 mins when solving questions)
+    // In Demo mode, any non-video app triggers maybe_stuck after 10s (or 15s for question solving)
+    const isWorkOrQuestions = isDemoMode ? true : (currentAppType === "work app" || isCurrentWindowSolvingQuestions);
+    const isMaybeStuck = isWorkOrQuestions && noActivityDuration >= maybeStuckThreshold;
 
     if (isStuck) {
       newState = STATES.STUCK;
@@ -641,6 +645,7 @@ function evaluateState() {
           isDemoMode,
           patienceMultiplier,
           windowSwitchesLast2Min: switchesCount,
+          activityType: lastActivitySource,
         });
       } catch (err) {
         console.error("[StuckDetector] Listener error:", err);
@@ -651,18 +656,29 @@ function evaluateState() {
   return didChange;
 }
 
+let onDemoToggleCallback = null;
+
+function setOnDemoToggle(cb) {
+  onDemoToggleCallback = cb;
+}
+
 /**
- * Toggles demo mode (15s for 8-min rule, 10s for 5-min rule).
+ * Toggles demo mode (10s for normal work, 15s for question solving).
  * @param {boolean} [forcedState] - Optional explicit boolean state
  */
 function toggleDemoMode(forcedState) {
   isDemoMode = typeof forcedState === "boolean" ? forcedState : !isDemoMode;
   console.log(
     `[StuckDetector] Demo mode ${
-      isDemoMode ? "ENABLED (15s inactive / 10s no-key)" : "DISABLED (8m inactive / 5m no-key)"
+      isDemoMode ? "ENABLED (10s work / 15s questions)" : "DISABLED (8m work / 15m questions)"
     }`
   );
   evaluateState();
+  if (typeof onDemoToggleCallback === "function") {
+    try {
+      onDemoToggleCallback(isDemoMode);
+    } catch (_) {}
+  }
   return isDemoMode;
 }
 
@@ -716,8 +732,11 @@ function init(options = {}) {
     hook.on("wheel", recordOtherActivity);
   }
 
-  // 2. Register demo mode shortcut in Electron
-  const shortcutKey = options.shortcut || "CommandOrControl+Alt+Shift+F9";
+  // 2. Register demo mode shortcuts in Electron (both 4-key and simple Ctrl+Alt+D)
+  const shortcutsToRegister = [
+    options.shortcut || "CommandOrControl+Alt+Shift+F9",
+    "CommandOrControl+Alt+D",
+  ];
   try {
     let electronGlobalShortcut = options.globalShortcut;
     if (!electronGlobalShortcut) {
@@ -726,13 +745,15 @@ function init(options = {}) {
     }
 
     if (electronGlobalShortcut && typeof electronGlobalShortcut.register === "function") {
-      const registered = electronGlobalShortcut.register(shortcutKey, () => {
-        toggleDemoMode();
-      });
-      if (registered) {
-        console.log(`[StuckDetector] Demo mode shortcut registered: ${shortcutKey}`);
-      } else {
-        console.warn(`[StuckDetector] Could not register shortcut: ${shortcutKey}`);
+      for (const sc of shortcutsToRegister) {
+        try {
+          const registered = electronGlobalShortcut.register(sc, () => {
+            toggleDemoMode();
+          });
+          if (registered) {
+            console.log(`[StuckDetector] Demo mode shortcut registered: ${sc}`);
+          }
+        } catch (_) {}
       }
     }
   } catch (err) {
@@ -809,6 +830,7 @@ module.exports = {
   getPatienceMultiplier,
   getPatienceCount,
   getManualMode,
+  setOnDemoToggle,
   setMockScreen,
   recordKeyActivity,
   recordOtherActivity,
