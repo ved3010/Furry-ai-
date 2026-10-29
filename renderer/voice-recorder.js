@@ -63,20 +63,31 @@
 
       mediaRecorder.onstop = async () => {
         cleanupAudio();
+        const searchInput = document.getElementById("agent-search-input");
+        if (searchInput && searchInput.placeholder === "Listening... 🎙️") {
+          searchInput.placeholder = "Tell me your tasks (e.g. math homework)...";
+        }
 
         if (audioChunks.length === 0) return;
 
         const audioBlob = new Blob(audioChunks, { type: mimeType });
         if (audioBlob.size < 500) return;
 
-        showBubble("Thinking... ✨", 4000);
+        window.catPet?.setThinking?.(true);
 
         try {
           const arrayBuffer = await audioBlob.arrayBuffer();
           if (window.voiceAPI?.transcribeAudio) {
             const result = await window.voiceAPI.transcribeAudio(arrayBuffer, mimeType);
             if (result?.ok && result.text) {
-              showBubble(`"${result.text}" 🐾`, 3000);
+              const text = result.text.trim();
+              if (text && searchInput) {
+                searchInput.value = text;
+                const searchForm = document.getElementById("agent-search-form");
+                if (searchForm) {
+                  searchForm.dispatchEvent(new Event("submit", { cancelable: true }));
+                }
+              }
             } else if (result?.error === "MISSING_KEY") {
               showBubble("Paste Groq key in .env file! 🔑", 4000);
             } else if (result?.error) {
@@ -86,24 +97,27 @@
         } catch (err) {
           console.error("[VoiceRecorder] Transcription failed:", err);
           showBubble("Voice error 😿", 2500);
+        } finally {
+          window.catPet?.setThinking?.(false);
         }
       };
 
       mediaRecorder.start(200);
       isRecording = true;
       if (micButton) micButton.classList.add("is-listening");
-      showBubble("Listening... 🎙️", 0);
+      const searchInput = document.getElementById("agent-search-input");
+      if (searchInput) searchInput.placeholder = "Listening... 🎙️";
 
       // Voice Activity Detection (silence detection)
       setupVad(mediaStream);
 
-      // Safety timeout after 7 seconds max
+      // Generous safety cap (10 minutes) so user can speak for 2 sec, 1 min, or 10 min without cutoff
       if (recordingTimeout) clearTimeout(recordingTimeout);
       recordingTimeout = setTimeout(() => {
         if (isRecording) {
           stopRecording();
         }
-      }, 7000);
+      }, 10 * 60 * 1000);
     } catch (err) {
       console.error("[VoiceRecorder] getUserMedia error:", err);
       showBubble("Mic permission needed 🎙️", 3000);
@@ -127,6 +141,7 @@
 
       let hasSpoken = false;
       let silenceStartTime = null;
+      const recordingStartTime = Date.now();
 
       if (vadInterval) clearInterval(vadInterval);
       vadInterval = setInterval(() => {
@@ -143,19 +158,24 @@
         }
         const avgVolume = sum / bufferLength;
 
-        // Threshold for human speech vs background room noise
-        if (avgVolume > 14) {
+        // Threshold for human speech vs background room noise (raised to 24 so background noise/fans aren't counted as speech)
+        if (avgVolume > 24) {
           hasSpoken = true;
           silenceStartTime = null;
         } else if (hasSpoken) {
           if (!silenceStartTime) {
             silenceStartTime = Date.now();
-          } else if (Date.now() - silenceStartTime > 1300) {
-            // User paused speaking for 1.3 seconds -> automatically stop and transcribe!
+          } else if (Date.now() - silenceStartTime > 1400) {
+            // User paused speaking for 1.4 seconds -> automatically conclude and transcribe!
             clearInterval(vadInterval);
             vadInterval = null;
             stopRecording();
           }
+        } else if (!hasSpoken && Date.now() - recordingStartTime > 6000) {
+          // If no speech detected within 6 seconds, stop to prevent background noise accumulation
+          clearInterval(vadInterval);
+          vadInterval = null;
+          stopRecording();
         }
       }, 100);
     } catch (err) {

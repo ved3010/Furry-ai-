@@ -1,8 +1,8 @@
 {
-  "name": "comnyang-dev",
-  "productName": "Comnyang Dev",
+  "name": "furry-dev",
+  "productName": "Furry Dev",
   "version": "0.1.45-test.202606100557",
-  "description": "컴퓨터 안에서 함께 일하는 동반자 콤냥이 — 뽀모도로 + 건강 케어 데스크탑 펫",
+  "description": "컴퓨터 안에서 함께 일하는 동반자 Furry — 뽀모도로 + 건강 케어 데스크탑 펫",
   "type": "commonjs",
   "main": "start-agent.js",
   "scripts": {

@@ -55,3 +55,6 @@ classroom-token.json
 classroom-cache.json
 credentials.json
 token.json
+
+# Local backup archives
+*.zip

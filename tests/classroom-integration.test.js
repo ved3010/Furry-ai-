@@ -108,6 +108,8 @@ test("Classroom: agent-ask responds accurately to subjects, assignment counts, a
         ipcMain: { handle: (key, fn) => handlers.set(key, fn) }, safeStorage: { isEncryptionAvailable: () => false },
         shell: { openExternal: async () => {}, openPath: async () => "" },
       };
+      if (name === "./tiny-step-ai") return require("../tiny-step-ai");
+      if (name === "./cat-energy") return require("../cat-energy");
       if (name === "./agent-shortcuts") return require("../agent-shortcuts");
       if (name === "./app-launcher") return require("../app-launcher");
       if (name === "./google-classroom") return mockClassroom;

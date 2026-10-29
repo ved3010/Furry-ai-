@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Privacy &amp; comfort</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="privacy-window">
+    <header class="privacy-header">
+      <div class="header-icon">🐾</div>
+      <div class="header-text">
+        <h1>Privacy &amp; comfort</h1>
+        <p class="header-subtitle">Simple, calm, and completely transparent about your data.</p>
+      </div>
+    </header>
+
+    <!-- Sensory Comfort Section (Quiet mode, Calm motion, Soft colors) -->
+    <section class="sensory-card" aria-label="Sensory comfort settings">
+      <div class="sensory-header">
+        <span class="sensory-title">Sensory comfort</span>
+        <span class="sensory-subtitle">Customize audio, movement, and visual intensity</span>
+      </div>
+
+      <div class="sensory-toggle-list">
+        <!-- Quiet Mode -->
+        <div class="sensory-item">
+          <div class="sensory-info">
+            <div class="sensory-label-row">
+              <span class="sensory-name">Quiet mode</span>
+              <span id="quiet-status-badge" class="status-badge off">Off</span>
+            </div>
+            <p class="sensory-desc">Mute all sounds, including meow, purr, chimes, Pomodoro and stretch sounds.</p>
+          </div>
+          <label class="switch" for="quiet-mode-toggle" aria-label="Toggle quiet mode">
+            <input type="checkbox" id="quiet-mode-toggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <!-- Calm Motion -->
+        <div class="sensory-item">
+          <div class="sensory-info">
+            <div class="sensory-label-row">
+              <span class="sensory-name">Calm motion</span>
+              <span id="calm-motion-status-badge" class="status-badge off">Off</span>
+            </div>
+            <p class="sensory-desc">Disable walking, hearts, steam, typing and bubble animations. Bubble appears in place without animation.</p>
+          </div>
+          <label class="switch" for="calm-motion-toggle" aria-label="Toggle calm motion">
+            <input type="checkbox" id="calm-motion-toggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+
+        <!-- Soft Colors -->
+        <div class="sensory-item">
+          <div class="sensory-info">
+            <div class="sensory-label-row">
+              <span class="sensory-name">Soft colors</span>
+              <span id="soft-colors-status-badge" class="status-badge off">Off</span>
+            </div>
+            <p class="sensory-desc">Use a muted, lower-contrast style for the check-in bubble, the My tasks window and the Privacy panel.</p>
+          </div>
+          <label class="switch" for="soft-colors-toggle" aria-label="Toggle soft colors">
+            <input type="checkbox" id="soft-colors-toggle">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Stuck Detection Control Card -->
+    <section class="control-card" aria-label="Stuck detection control">
+      <div class="control-info">
+        <div class="control-title-row">
+          <span class="control-title">Stuck detection</span>
+          <span id="stuck-status-badge" class="status-badge on">On</span>
+        </div>
+        <p class="control-description">
+          When turned Off, the stuck detector and gentle check-in stop completely (no state changes, no cat movement, no bubbles).
+        </p>
+      </div>
+      <label class="switch" for="stuck-detection-toggle" aria-label="Toggle stuck detection">
+        <input type="checkbox" id="stuck-detection-toggle" checked>
+        <span class="slider"></span>
+      </label>
+    </section>
+
+    <!-- 6 Core Privacy Statements -->
+    <section class="privacy-statements" aria-label="Privacy principles">
+      <article class="statement-card">
+        <div class="statement-num">1</div>
+        <div class="statement-body">
+          <p class="statement-text">
+            We only measure the time since your last key or mouse activity, and how often you switch windows. We never read what you type.
+          </p>
+        </div>
+      </article>
+
+      <article class="statement-card">
+        <div class="statement-num">2</div>
+        <div class="statement-body">
+          <p class="statement-text">
+            Window and app names are checked on your device only and are never saved or sent.
+          </p>
+        </div>
+      </article>
+
+      <article class="statement-card">
+        <div class="statement-num">3</div>
+        <div class="statement-body">
+          <p class="statement-text">
+            The text you type in the tiny-step box or task you start, your cat energy level, and a matching tip are sent to the AI (Gemini).
+          </p>
+        </div>
+      </article>
+
+      <article class="statement-card">
+        <div class="statement-num">4</div>
+        <div class="statement-body">
+          <p class="statement-text">
+            If you use the microphone button, your voice recording is sent to Groq to turn it into text.
+          </p>
+        </div>
+      </article>
+
+      <article class="statement-card">
+        <div class="statement-num">5</div>
+        <div class="statement-body">
+          <p class="statement-text">
+            If you connect Google Classroom, your assignments stay on this device.
+          </p>
+        </div>
+      </article>
+
+      <article class="statement-card">
+        <div class="statement-num">6</div>
+        <div class="statement-body">
+          <p class="statement-text">
+            Nothing is sold or shared. You can turn tracking off at any time.
+          </p>
+        </div>
+      </article>
+    </section>
+
+    <footer class="privacy-footer">
+      <span class="footer-note">Settings are stored locally on your computer.</span>
+      <button type="button" id="close-btn" class="close-btn">Close</button>
+    </footer>
+  </div>
+
+  <script src="privacy.js"></script>
+</body>
+</html>

@@ -168,6 +168,7 @@
     document.body.removeAttribute("data-agent-search-hidden");
     searchToggle.setAttribute("aria-expanded", "true");
     searchToggle.removeAttribute("data-attention");
+    if (searchInput) searchInput.placeholder = "Ask anything...";
     if (responseText.textContent || busy || chatHistory.length > 0) responsePanel.hidden = false;
     if (focus) searchInput.focus();
     syncInteraction();
@@ -196,8 +197,9 @@
     clearResponseTimer();
     const version = responseVersion;
     responseText.textContent = String(text || "");
-    responsePrompt.textContent = prompt ? `You: ${prompt}` : "";
-    responsePrompt.hidden = !prompt;
+    const cleanPrompt = prompt ? String(prompt).replace(/^(?:You:\s*)+/i, "").trim() : "";
+    responsePrompt.textContent = cleanPrompt ? `You: ${cleanPrompt}` : "";
+    responsePrompt.hidden = !cleanPrompt;
     responseStatus.textContent = status;
     if (responseScroll) responseScroll.scrollTop = responseScroll.scrollHeight;
     responsePanel.hidden = false;
@@ -364,7 +366,8 @@
   async function submitQuestion(event) {
     event?.preventDefault();
     const prompt = searchInput.value.trim();
-    if (!prompt || busy || panel.hidden) return;
+    if (!prompt || busy) return;
+    if (panel.hidden) showBar();
 
     // Commit previous turn into history if present
     const previousReply = responseText.textContent.trim();
@@ -384,11 +387,32 @@
         throw new Error("The agent did not supply a valid approval request. Please Retry.");
       }
       finishOperation(id);
-      if (searchInput.value.trim() === prompt) searchInput.value = "";
+      if (searchInput.value.trim() === prompt || !busy) searchInput.value = "";
       showResponse(result.reply || "Done.", { status: result.confirmationRequired ? "Permission needed" : "Reply" });
       window.catPet?.setThinking?.(false);
       window.catPet?.meow?.();
       window.catPet?.jump?.();
+
+      // When chat tab is open, show answer ONLY beside cat in chat panel.
+      // If user closed the chat tab, show one bubble on top of the cat!
+      if (panel.hidden) {
+        const replyText = String(result.reply || "");
+        const topTaskMatch = replyText.match(/🎯\s*\**#1[^\n*]*\**:\s*([^\n]+)/i);
+        const tinyStepMatch = replyText.match(/🐾\s*\**Your Tiny Step[^\n]*\**:\s*\n*([^\n]+)/i);
+        if (topTaskMatch || tinyStepMatch) {
+          const top = topTaskMatch ? topTaskMatch[1].replace(/\*\*/g, "").trim() : "";
+          const step = tinyStepMatch ? tinyStepMatch[1].replace(/\*\*/g, "").trim() : "";
+          const catSpeech = top && step ? `🎯 #1: ${top}\n🐾 Tiny Step: ${step}` : (top ? `🎯 #1: ${top}` : step);
+          window.catPet?.speak?.(catSpeech, { duration: 9000, kind: "notice" });
+        } else {
+          const firstLine = replyText.split("\n").map((l) => l.trim()).filter(Boolean)[0] || "";
+          if (firstLine && firstLine.length <= 100) {
+            window.catPet?.speak?.(firstLine.replace(/\*\*/g, ""), { duration: 4500, kind: "notice" });
+          } else {
+            window.catPet?.speak?.("Mew! I answered in chat. 🐾", { duration: 3500, kind: "notice" });
+          }
+        }
+      }
       if (result.confirmationRequired) {
         pendingAction = result.action;
         pendingApprovalToken = result.approvalToken;
@@ -483,17 +507,19 @@
     }
   }
 
-  function isInside(element, point) {
+  function isInside(element, point, margin = 8) {
     if (!point || !element || element.closest("[hidden], [inert]")) return false;
     const style = getComputedStyle(element);
     if (style.display === "none" || style.visibility === "hidden" || style.pointerEvents === "none" || style.opacity === "0") return false;
     const rect = element.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0 && point.clientX >= rect.left && point.clientX <= rect.right
-      && point.clientY >= rect.top && point.clientY <= rect.bottom;
+    return rect.width > 0 && rect.height > 0 && point.clientX >= (rect.left - margin) && point.clientX <= (rect.right + margin)
+      && point.clientY >= (rect.top - margin) && point.clientY <= (rect.bottom + margin);
   }
 
   function syncInteraction() {
-    const targets = panel.hidden ? [searchToggle]
+    const bubbleEl = document.getElementById("cat-speech-bubble");
+    const isPrompt = document.body.dataset.speech === "gentle-prompt" || document.body.dataset.speech === "gentle-paw";
+    const targets = panel.hidden ? [searchToggle, ...(isPrompt && bubbleEl ? [bubbleEl] : [])]
       : [searchShell, settingsPopover, ...(settingsPopover.hidden ? [responsePanel, ...quickButtons] : [])];
     const active = targets.some((element) => isInside(element, lastPointer));
     if (active === interactionActive) return;
@@ -505,11 +531,16 @@
   }
 
   searchForm.addEventListener("submit", submitQuestion);
-  get("agent-search-hide").addEventListener("click", () => hideBar(true));
+  const searchHideBtn = get("agent-search-hide");
+  const onHideBar = () => hideBar(true);
+  searchHideBtn.addEventListener("click", onHideBar);
+  searchHideBtn.addEventListener("pointerdown", onHideBar);
+  searchHideBtn.addEventListener("mousedown", onHideBar);
   searchToggle.addEventListener("click", () => showBar(true));
   searchSettings.addEventListener("click", () => setSettingsOpen(settingsPopover.hidden, true));
   get("agent-settings-close").addEventListener("click", () => setSettingsOpen(false, true));
-  get("agent-response-close").addEventListener("click", () => {
+  const responseCloseBtn = get("agent-response-close");
+  const onResponseClose = () => {
     if (busy) return hideBar(true);
     clearResponseTimer();
     clearApproval();
@@ -517,7 +548,29 @@
     responseText.textContent = "";
     searchInput.focus();
     syncInteraction();
+  };
+  responseCloseBtn.addEventListener("click", onResponseClose);
+  responseCloseBtn.addEventListener("pointerdown", onResponseClose);
+  responseCloseBtn.addEventListener("mousedown", onResponseClose);
+
+  const keepActive = () => {
+    if (!interactionActive) {
+      interactionActive = true;
+      if (window.agentAPI?.setInteractionActive) window.agentAPI.setInteractionActive(true);
+      else window.electronAPI?.setMouseEventsEnabled?.(true);
+    }
+  };
+  [searchShell, responsePanel, settingsPopover].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("mouseenter", keepActive);
+    el.addEventListener("pointerenter", keepActive);
   });
+  responsePanel.addEventListener("wheel", (e) => {
+    e.stopPropagation();
+    if (responseScroll) {
+      responseScroll.scrollTop += e.deltaY;
+    }
+  }, { passive: true });
   retryButton.addEventListener("click", () => {
     if (!failedPrompt || busy) return;
     const prompt = failedPrompt;
@@ -587,11 +640,51 @@
     }
   });
 
-  window.electronAPI?.onCatOpenChat?.(() => {
-    showBar(true);
-    if (!responseText.textContent && !busy) {
-      showResponse("I'm here! What tasks do you have on your plate? Tell me your tasks and I'll arrange them by priority for you! 🐾", { status: "Priority Planner" });
+  const ENERGY_DESCRIPTORS = {
+    1: { level: 1, name: "Loaf", emoji: "💤", subtitle: "curled up, resting" },
+    2: { level: 2, name: "Sleepy", emoji: "🥱", subtitle: "yawning, cozy" },
+    3: { level: 3, name: "Chill", emoji: "😸", subtitle: "cheerful & steady" },
+    4: { level: 4, name: "Playful", emoji: "⚡", subtitle: "energetic & lively" },
+    5: { level: 5, name: "Zoomies", emoji: "💨", subtitle: "high energy, full sprint" },
+  };
+
+  async function openChatWithEnergy(level, fromCheckIn = true) {
+    const num = Number(level) || 3;
+    if (window.electronAPI?.energySet) {
+      try { await window.electronAPI.energySet(num); } catch (_) {}
     }
+    const info = ENERGY_DESCRIPTORS[num] || ENERGY_DESCRIPTORS[3];
+    showBar(true);
+
+    if (fromCheckIn) {
+      showResponse(
+        `Mew! Your energy is set to Level ${num} (${info.name} ${info.emoji}). 🐾\n\nTell me what tasks or homework you need to work on, and I will prioritize them and give you a tiny step tailored to your energy!`,
+        { status: `Level ${num} · ${info.name}` }
+      );
+      if (searchInput) {
+        searchInput.placeholder = "Tell me your tasks (e.g. math homework, history essay)...";
+        searchInput.focus();
+        searchInput.select?.();
+      }
+      window.catPet?.meow?.();
+    } else {
+      if (searchInput) {
+        searchInput.placeholder = "Ask anything...";
+        searchInput.focus();
+      }
+    }
+  }
+
+  window.addEventListener("cat-open-chat-energy", (event) => {
+    openChatWithEnergy(event?.detail?.level, true);
+  });
+
+  window.electronAPI?.onCatOpenChat?.(async () => {
+    let level = 3;
+    try {
+      if (window.electronAPI?.energyGet) level = await window.electronAPI.energyGet();
+    } catch (_) {}
+    openChatWithEnergy(level, false);
   });
   window.addEventListener("cat-toggle-chat", () => {
     if (panel.hidden) {

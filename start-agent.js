@@ -1,7 +1,32 @@
 "use strict";
 
-const { app, BrowserWindow, screen } = require("electron");
+const fs = require("fs");
 const path = require("path");
+
+// Load .env automatically if present
+try {
+  const envPath = path.join(__dirname, ".env");
+  if (fs.existsSync(envPath)) {
+    const content = fs.readFileSync(envPath, "utf8");
+    for (const line of content.split("\n")) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const eqIdx = trimmed.indexOf("=");
+      if (eqIdx !== -1) {
+        const key = trimmed.slice(0, eqIdx).trim();
+        let val = trimmed.slice(eqIdx + 1).trim();
+        if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+          val = val.slice(1, -1);
+        }
+        if (key && !process.env[key]) {
+          process.env[key] = val;
+        }
+      }
+    }
+  }
+} catch (_) {}
+
+const { app, BrowserWindow, screen } = require("electron");
 
 if (process.platform === "darwin") {
   const childProcess = require("child_process");
@@ -27,7 +52,7 @@ app.whenReady().then(() => {
         editorWin = new BrowserWindow({
           width: 900,
           height: 720,
-          title: "Comnyang Dev - Desktop Companion & Pattern Editor",
+          title: "Furry Dev - Desktop Companion & Pattern Editor",
           backgroundColor: "#1e1e1e",
           icon: path.join(__dirname, "assets", "comnyang-logo.png"),
           webPreferences: {
@@ -41,7 +66,7 @@ app.whenReady().then(() => {
         editorWin.show();
         editorWin.focus();
         editorWin.moveTop();
-        console.log("[Comnyang] Editor window opened!");
+        console.log("[Furry] Editor window opened!");
       }
 
       // Also ensure the desktop pet has taskbar enabled and is centered
@@ -52,7 +77,6 @@ app.whenReady().then(() => {
           try { win.show(); } catch (_) {}
           try { win.focus(); } catch (_) {}
           try { win.setAlwaysOnTop(true, "screen-saver"); } catch (_) {}
-          try { win.webContents.send("cat-open-chat"); } catch (_) {}
         }
       }
     } catch (e) {

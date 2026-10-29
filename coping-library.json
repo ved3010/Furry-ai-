@@ -1,0 +1,86 @@
+[
+  {
+    "id": "two_minute_rule",
+    "name": "2-minute rule",
+    "tip": "If it feels huge, commit to working on it for just 2 minutes. You can stop right after.",
+    "keywords": ["overwhelmed", "stuck", "start", "starting", "hard", "huge", "big", "procrastinating", "freeze", "frozen"]
+  },
+  {
+    "id": "open_the_file",
+    "name": "Just open the file",
+    "tip": "Don't write anything yet—literally just open the document or notebook and title the page.",
+    "keywords": ["blank", "file", "doc", "document", "tab", "open", "empty", "start", "sheet", "notebook"]
+  },
+  {
+    "id": "bad_first_draft",
+    "name": "Write a bad first draft",
+    "tip": "Give yourself permission to write complete garbage. A messy draft can be polished; a blank page cannot.",
+    "keywords": ["essay", "writing", "draft", "paper", "report", "perfect", "perfectionism", "stuck", "write", "words"]
+  },
+  {
+    "id": "five_minute_timer",
+    "name": "5-minute timer",
+    "tip": "Set a timer for 5 minutes and focus on one tiny detail. When the timer rings, you can take a break.",
+    "keywords": ["timer", "clock", "focus", "time", "cant focus", "distracted", "short", "racing"]
+  },
+  {
+    "id": "body_doubling",
+    "name": "Body doubling",
+    "tip": "I am right here with you purring by your screen. You do your step, and I'll keep watch.",
+    "keywords": ["alone", "lonely", "motivation", "company", "isolate", "nobody", "quiet", "bored"]
+  },
+  {
+    "id": "drink_water",
+    "name": "Drink water & reset",
+    "tip": "Take a slow sip of cool water, roll your shoulders back, and unclench your jaw.",
+    "keywords": ["tired", "headache", "thirst", "dry", "exhausted", "stiff", "heavy", "eyes", "posture"]
+  },
+  {
+    "id": "change_location",
+    "name": "Change location",
+    "tip": "Shift to another chair, stand up for a stretch, or move your laptop to a brighter spot.",
+    "keywords": ["stuck", "same place", "chair", "room", "bored", "sluggish", "restless", "change"]
+  },
+  {
+    "id": "first_sentence",
+    "name": "Write just one sentence",
+    "tip": "Write just one simple sentence or note down 3 messy bullet points without worrying about formatting.",
+    "keywords": ["sentences", "notes", "bullets", "outline", "summary", "paragraph", "typing"]
+  },
+  {
+    "id": "solve_example_one",
+    "name": "Solve example or problem #1",
+    "tip": "Ignore the entire problem set. Look only at question #1 or copy down the first given formula.",
+    "keywords": ["math", "physics", "code", "programming", "problem", "solve", "formula", "exercise", "homework", "bugs"]
+  },
+  {
+    "id": "brain_dump",
+    "name": "Messy brain dump",
+    "tip": "Scribble whatever messy thoughts you have on a piece of scrap paper or sticky note to unload your mind.",
+    "keywords": ["messy", "chaos", "racing thoughts", "overthinking", "stress", "cluttered", "anxious", "confused"]
+  },
+  {
+    "id": "read_one_heading",
+    "name": "Read just one heading or paragraph",
+    "tip": "Don't read the whole chapter. Just read the next bold heading and the very first sentence underneath it.",
+    "keywords": ["reading", "book", "textbook", "chapter", "literature", "article", "paper", "pdf"]
+  },
+  {
+    "id": "ten_deep_breaths",
+    "name": "10-second breath break",
+    "tip": "Inhale gently for 4 counts, hold for 4, and sigh it out. Your nervous system comes first.",
+    "keywords": ["anxious", "panic", "heart racing", "overwhelmed", "stressed", "tense", "breathe", "scared"]
+  },
+  {
+    "id": "organize_three_items",
+    "name": "Clear 3 items from desk",
+    "tip": "Clear just three cups, pens, or wrappers off your desk so your hands have clean breathing room.",
+    "keywords": ["mess", "desk", "dirty", "clutter", "space", "environment", "surroundings"]
+  },
+  {
+    "id": "break_into_twos",
+    "name": "Slice in half twice",
+    "tip": "Cut what you think you need to do in half. Then cut that half in half again. That's your true first step.",
+    "keywords": ["huge", "too much", "impossible", "mountain", "complex", "difficult", "heavy"]
+  }
+]

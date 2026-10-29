@@ -10,6 +10,7 @@ const { inferShortcut } = require("./agent-shortcuts");
 const { normalizeMusicAction, executeMusicAction } = require("./agent-music");
 const appLauncher = require("./app-launcher");
 const googleClassroom = require("./google-classroom");
+const catEnergy = require("./cat-energy");
 const {
   app,
   BrowserWindow,
@@ -143,12 +144,48 @@ function isLocalEndpoint(value) {
   }
 }
 
+function loadEnv() {
+  try {
+    const envPath = path.join(__dirname, ".env");
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, "utf8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx !== -1) {
+          const key = trimmed.slice(0, eqIdx).trim();
+          let val = trimmed.slice(eqIdx + 1).trim();
+          if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+            val = val.slice(1, -1);
+          }
+          if (key && !process.env[key]) {
+            process.env[key] = val;
+          }
+        }
+      }
+    }
+  } catch (_) {}
+}
+loadEnv();
+
 function loadState() {
-  if (stateLoaded) return;
+  if (stateLoaded) {
+    if (!config?.apiKey && canUseSafeStorage()) {
+      const savedConfig = readJson("config.json", {});
+      const storedApiKey = decryptApiKey(savedConfig);
+      if (storedApiKey) {
+        config.apiKey = storedApiKey;
+        apiKeyStatus = "stored securely";
+      }
+    }
+    return;
+  }
+  loadEnv();
   const savedConfig = readJson("config.json", {});
   const storedApiKey = decryptApiKey(savedConfig);
-  const environmentApiKey = process.env.AGENT_API_KEY
-    || process.env.GEMINI_API_KEY
+  const environmentApiKey = process.env.GEMINI_API_KEY
+    || process.env.AGENT_API_KEY
     || process.env.OPENAI_API_KEY
     || process.env.GOOGLE_API_KEY
     || "";
@@ -162,7 +199,7 @@ function loadState() {
     : environmentApiKey
       ? "loaded from environment"
       : savedConfig.apiKeyEncrypted
-        ? "saved key cannot be unlocked in this app session"
+        ? (canUseSafeStorage() ? "saved key cannot be unlocked in this app session" : "waiting for safeStorage")
         : isLocalEndpoint(config.baseUrl)
           ? "not required for local endpoint"
           : "missing";
@@ -174,6 +211,13 @@ function loadState() {
   tasks = Array.isArray(savedTasks) ? savedTasks : [];
   loadApprovalGrants();
   stateLoaded = true;
+}
+
+if (app && typeof app.whenReady === "function") {
+  app.whenReady().then(() => {
+    stateLoaded = false;
+    loadState();
+  });
 }
 
 function saveConfig() {
@@ -277,14 +321,47 @@ function buildSystemPrompt() {
     : "(none)";
   const classroomSummary = typeof googleClassroom.getClassroomSummaryText === "function" ? googleClassroom.getClassroomSummaryText() : "";
 
+  let energyLevel = 3;
+  let energyInfo = null;
+  try {
+    energyLevel = catEnergy.getEnergyLevel();
+    energyInfo = catEnergy.getEnergyInfo(energyLevel);
+  } catch (_) {
+    energyLevel = 3;
+    energyInfo = { level: 3, name: "Chill", emoji: "😸", subtitle: "cheerful & steady" };
+  }
+  const energyName = energyInfo?.name || "Chill";
+  const energyEmoji = energyInfo?.emoji || "😸";
+  const energyDesc = energyInfo?.subtitle || energyInfo?.description || "cheerful & steady";
+
   return [
     `You are ${catName}, a warm but concise personal desktop cat assistant.`,
     userName ? `The user's name is ${userName}.` : "The user's name is unknown.",
     `The user's local date is ${localDate}; their time zone is ${timeZone}. Use this when interpreting relative dates and times.`,
+    `The user's current cat energy level is Level ${energyLevel} (${energyName} ${energyEmoji} — ${energyDesc}).`,
     "You can chat, maintain lightweight memories and tasks, create reminders, and propose safe computer actions.",
     "Understand natural-language questions, follow the conversation, and answer directly before offering optional next steps.",
     "Help with planning, studying, writing, coding explanations, decisions, and breaking work into concrete steps. Ask one concise question when essential details are missing instead of guessing.",
-    "When the user shares or tells you their tasks or to-do list, arrange and prioritize them clearly (e.g. by Urgent & Important, High / Medium / Low priority, estimated effort, and logical sequence). Explain why each task is prioritized in that order, and suggest a clear, actionable first step to get started without feeling overwhelmed.",
+    `TASK PRIORITIZATION BY ENERGY LEVEL (${energyName.toUpperCase()} ${energyEmoji} — LEVEL ${energyLevel}):`,
+    `When the user tells, shares, or lists their tasks, assignments, or to-do list:`,
+    `1. Acknowledge their exact energy level (Level ${energyLevel}: ${energyName} ${energyEmoji}) up front and adapt your entire response tone accordingly.`,
+    `2. CRITICAL TASK CLEANING & EXTRACTION: Cleanly isolate the subject/task name. Strip conversational filler prefixes (e.g. 'tomorrow I have', 'next week', 'I need to', 'due tomorrow', 'I got') and strip emotional remarks (e.g. 'I am feeling so stressed', 'feeling drained'). For example, 'tommorow i have operating system assesment' MUST be cleanly formatted as 'Operating System Assessment' (or 'OS Assessment'). 'discrcte maths project review' must be cleanly formatted as 'Discrete Maths Project Review'. 'club web dev interview i am feelong s stressed' must be cleanly formatted as 'Club Web Dev Interview'. NEVER retain conversational sentences or stress venting inside the task title itself!`,
+    `3. Prioritize their actual tasks to match this energy level:`,
+    `   - Level 1 (Loaf 💤): Ultra-low friction & compassionate rest mode. The student is feeling overwhelmed, tired, or stressed. Speak in a warm, comforting, soothing voice. Acknowledge their Loaf 💤 energy. Do NOT push for high productivity or pressure them. Prioritize the single easiest, lowest-friction task first. Give explicit permission to rest, take deep breaths, and take breaks. Recommend a micro-step of just 1-2 minutes max.`,
+    `   - Level 2 (Sleepy 🥱): Low cognitive load. Gentle, cozy tone. Short gentle 10-minute focus blocks. Pick the clearest, low-strain task. Reassure them that steady, slow progress is completely valid.`,
+    `   - Level 3 (Chill 😸): Balanced, steady flow with standard 20-minute focus intervals. Calm, cheerful, orderly guidance.`,
+    `   - Level 4 (Playful ⚡): High momentum! Energetic and spirited tone! Tackle the biggest, toughest challenge first in a 25-minute power sprint!`,
+    `   - Level 5 (Zoomies 💨): Maximum speed! Full speed blitz tone! Blitz through challenges against a 15-minute challenge timer!`,
+    `4. Format clearly with emojis (🎯 **#1 Top Priority**, ⚡ **#2 Next**, 🐾 **Later**).`,
+    `5. CRITICAL TINY STEP RULE: NEVER give generic or random advice like 'open file', 'open tab', or 'prepare workspace'. ALWAYS generate a specific, concrete, realistic first action tailored directly to what the #1 task actually is (e.g. for 'Math assignment 3', specify 'Solve problem #1'; for 'History essay', specify 'Write the title and 1 opening thesis sentence'; for 'Physics lab', specify 'Draft the apparatus and hypothesis'; for 'Operating System Assessment', specify 'Review the definition of process scheduling or memory paging for 2 minutes'). Conclude with: 🐾 **Your Tiny Step Right Now:** followed by that concrete first action.`,
+    `6. SOOTHING, KIND TONE FOR STRESSED / DRAINED USERS: When the user mentions feeling stressed, drained, overwhelmed, exhausted, or anxious (or when cat energy is Level 1 Loaf 💤 or Level 2 Sleepy 🥱): Speak in the most comforting, gentle, and warm tone. Validate their feelings with soothing reassurance (e.g. 'Take a gentle, slow breath... It's completely okay to feel drained when you have multiple heavy things coming up. We are taking all the pressure off right now.'). Give them explicit permission to rest, and focus on only one tiny, gentle 2-minute step.`,
+    `7. CRITICAL: ASK TARGETED QUESTIONS TO REFINE PRIORITY ACCURACY:`,
+    `   After providing the prioritized tasks and the concrete tiny step, you MUST ALWAYS conclude with 2 to 3 targeted, specific questions to give an even more accurate, fine-tuned priority ranking tailored to their exact schedule:`,
+    `   • Schedule & Exact hours: 'What exact time tomorrow is each task or assessment scheduled or due?'`,
+    `   • Weight & Stakes: 'Which of these carries the highest grade percentage, marks, or personal importance for you?'`,
+    `   • Preparation status: 'How much prep is already done for each (e.g. starting from scratch, or do you have slides/notes ready)?'`,
+    `   • Mental friction: 'Which of these feels most mentally draining or stressful to tackle right now?'`,
+    `   Always let the student know: 'Share any of these details with me, and I will instantly re-adjust and fine-tune your priority list with 100% precision! 🐾' (Do not ask about a detail if they already stated it).`,
     "Use stored memories and open tasks only when relevant. Save or change personal data only when the user clearly asks you to do so.",
     "Be warm and human, but do not add cat sounds to every answer. Keep simple answers short and make complex answers well-structured.",
     "You cannot see the screen or read arbitrary local files. However, Google Classroom IS integrated via OAuth with live access to courses and assignments. Use the Google Classroom details provided below to answer questions about subjects, courses, and assignments accurately. When the user asks to check, sync, fetch, or save assignments or deadlines from Google Classroom, propose the action: {\"type\": \"check_classroom\"}.",
@@ -382,7 +459,7 @@ function isGeminiEndpoint(value) {
 function logModelFailure(operation, error) {
   // Keep diagnostics useful without logging prompts, response bodies, URLs with
   // credentials, or any part of the API key.
-  console.warn("[Comnyang] agent model failure", {
+  console.warn("[Furry] agent model failure", {
     operation,
     code: error?.code || "model-error",
     status: error?.status,
@@ -569,8 +646,12 @@ function formatReminders() {
 
 function formatTasks() {
   const openTasks = tasks.filter((item) => !item.completed);
-  if (!openTasks.length) return "You don't have any open tasks.";
-  return openTasks.map((item) => `• ${item.id}: ${item.title}`).join("\n");
+  if (!openTasks.length) return "You don't have any open tasks in My tasks.";
+  return `Here are your open tasks in **My tasks**:\n` + openTasks.map((item) => {
+    const due = item.deadline ? ` (Due: ${item.deadline})` : "";
+    const size = item.size ? ` · ${item.size}` : "";
+    return `• **${item.title}**${due}${size}`;
+  }).join("\n");
 }
 
 function applyInternalAction(action) {
@@ -779,6 +860,8 @@ async function handleCheckClassroom(userMessage = "") {
           classroomId: a.id,
           link: a.link,
           dueDate: a.dueDate,
+          deadline: a.dueDate,
+          size: "Medium",
           completed: false,
           createdAt: now,
         });
@@ -822,7 +905,7 @@ async function handleCheckClassroom(userMessage = "") {
       if (pendingAssignments.length > 0) {
         lines.push(`📝 **Pending (${pendingAssignments.length}):**`);
         pendingAssignments.forEach((a, i) => {
-          const status = a.isOverdue ? "⚠️ Overdue" : a.dueDateFormatted === "No due date" ? "No due date" : `Due ${a.dueDateFormatted}`;
+          const status = a.isOverdue ? "🐾 waiting for you" : a.dueDateFormatted === "No due date" ? "No due date" : `Due ${a.dueDateFormatted}`;
           lines.push(`  ${i + 1}. **${a.title}** (${a.courseName}) — ${status}`);
         });
       } else {
@@ -859,7 +942,7 @@ async function handleCheckClassroom(userMessage = "") {
     }
 
     const items = pendingAssignments.map((a, i) => {
-      const status = a.isOverdue ? "⚠️ Overdue" : a.dueDateFormatted === "No due date" ? "No due date" : `Due ${a.dueDateFormatted}`;
+      const status = a.isOverdue ? "🐾 waiting for you" : a.dueDateFormatted === "No due date" ? "No due date" : `Due ${a.dueDateFormatted}`;
       return `${i + 1}. **${a.title}** (${a.courseName}) — ${status}`;
     }).join("\n");
 
@@ -881,10 +964,131 @@ async function handleCheckClassroom(userMessage = "") {
   }
 }
 
+function isTaskPrioritizationRequest(text) {
+  return catEnergy.isTaskPrioritizationRequest(text);
+}
+
+function prioritizeTasksLocally(text, energyLevel = 3) {
+  const result = catEnergy.prioritizeTasks(text, energyLevel);
+  return { reply: result.reply, action: null };
+}
+
+function broadcastTasksUpdated() {
+  try {
+    const { BrowserWindow } = require("electron");
+    BrowserWindow.getAllWindows().forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("planner-tasks-changed");
+      }
+    });
+  } catch (_) {}
+}
+
+function notifyCatSpeech(text) {
+  try {
+    const { BrowserWindow, Notification } = require("electron");
+    try {
+      if (Notification && typeof Notification.isSupported === "function" && Notification.isSupported()) {
+        new Notification({ title: "Furry", body: text.replace(/^🐾\s*/, "") }).show();
+      }
+    } catch (_) {}
+    BrowserWindow.getAllWindows().forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("cat-speech", { text, kind: "reminder", duration: 5200 });
+      }
+    });
+  } catch (_) {}
+}
+
+function syncChatTasksToPlanner(userMessage) {
+  try {
+    const planner = require("./planner-lite");
+    const extracted = planner.extractTasksFromChat(userMessage);
+    if (!extracted || extracted.length === 0) return [];
+
+    loadState();
+    const addedTasks = [];
+
+    for (const item of extracted) {
+      const normalizedTitle = item.title.toLowerCase();
+      const existing = tasks.find((t) => !t.completed && t.title.toLowerCase() === normalizedTitle);
+      if (!existing) {
+        const newTask = {
+          id: `task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+          title: item.title,
+          deadline: item.deadline || null,
+          size: item.size || "Medium",
+          extraInfo: item.extraInfo || "",
+          notify: typeof item.notify === "boolean" ? item.notify : Boolean(item.deadline),
+          lastNotifiedDate: null,
+          completed: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        tasks.push(newTask);
+        addedTasks.push(newTask);
+      } else if (item.deadline && !existing.deadline) {
+        existing.deadline = item.deadline;
+        existing.updatedAt = new Date().toISOString();
+        addedTasks.push(existing);
+      }
+    }
+
+    if (addedTasks.length > 0) {
+      saveTasks();
+      broadcastTasksUpdated();
+      runDueTasksCheck();
+    }
+    return addedTasks;
+  } catch (err) {
+    console.warn("[agent-main] Failed to sync chat tasks to planner:", err?.message);
+    return [];
+  }
+}
+
+function runDueTasksCheck() {
+  try {
+    loadState();
+    const planner = require("./planner-lite");
+    const dueNotifications = planner.getInstance().checkDueTasksForNotification(new Date(), tasks);
+    if (dueNotifications && dueNotifications.length > 0) {
+      saveTasks();
+      for (const n of dueNotifications) {
+        notifyCatSpeech(n.message);
+      }
+    }
+  } catch (_) {}
+}
+
+try {
+  setInterval(runDueTasksCheck, 60 * 1000);
+  setTimeout(runDueTasksCheck, 5000);
+} catch (_) {}
+
 async function askModel(prompt) {
   loadState();
   const userMessage = normalizeText(prompt, 2_000);
   if (!userMessage) return { ok: false, reason: "empty" };
+
+  // Sync any tasks/deadlines mentioned by the user to My tasks
+  // Sync tasks to planner silently without displaying
+  syncChatTasksToPlanner(userMessage);
+  let addedTasks = [];
+  let savedTasksNote = "";
+  if (addedTasks.length > 0) {
+    const listBullets = addedTasks.map((t) => {
+      const dueStr = t.deadline ? ` (Due: ${t.deadline})` : "";
+      return `• **${t.title}**${dueStr} · ${t.size}`;
+    }).join("\n");
+    savedTasksNote = `\n\n🐾 *I stored ${addedTasks.length === 1 ? "this task" : "these tasks"} in your **My tasks** list:*\n${listBullets}`;
+  }
+
+  const withNote = (result) => {
+    if (false) {
+      return { ...result, reply: result.reply + savedTasksNote };
+    }
+    return result;
+  };
 
   // Useful local commands still work while the model provider is unavailable.
   const shortcut = inferShortcut(userMessage);
@@ -892,17 +1096,23 @@ async function askModel(prompt) {
     const action = normalizeAction(shortcut.action);
     if (action?.type === "check_classroom") {
       const classroomResult = await handleCheckClassroom(userMessage);
-      return buildActionResultReply(userMessage, shortcut.reply, action, classroomResult);
+      return withNote(buildActionResultReply(userMessage, shortcut.reply, action, classroomResult));
     }
     if (isAutoOpenAction(action)) {
       const result = await executeOpenAction(action);
-      return buildActionResultReply(userMessage, shortcut.reply, action, result);
+      return withNote(buildActionResultReply(userMessage, shortcut.reply, action, result));
     }
     const internalResult = applyInternalAction(action);
     if (!internalResult && hasApprovalGrant(action)) {
-      return buildActionResultReply(userMessage, shortcut.reply, action, await executeAction(action, "", "always"));
+      return withNote(buildActionResultReply(userMessage, shortcut.reply, action, await executeAction(action, "", "always")));
     }
-    return buildAgentReply(userMessage, shortcut.reply, action, internalResult);
+    return withNote(buildAgentReply(userMessage, shortcut.reply, action, internalResult));
+  }
+
+  // Fast local task prioritization if model is not configured
+  if (isTaskPrioritizationRequest(userMessage) && !config.apiKey && !isLocalEndpoint(config.baseUrl)) {
+    const localResult = prioritizeTasksLocally(userMessage, catEnergy.getEnergyLevel());
+    return withNote(buildAgentReply(userMessage, localResult.reply, null));
   }
 
   const systemPrompt = buildSystemPrompt();
@@ -917,10 +1127,15 @@ async function askModel(prompt) {
       maxTokens: isGeminiEndpoint(config.baseUrl) ? GEMINI_TOKEN_BUDGET : 1_200,
     });
   } catch (error) {
+    if (isTaskPrioritizationRequest(userMessage)) {
+      console.warn("[Furry] model request failed, falling back to local energy task prioritization:", error?.message);
+      const localResult = prioritizeTasksLocally(userMessage, catEnergy.getEnergyLevel());
+      return withNote(buildAgentReply(userMessage, localResult.reply, null));
+    }
     if ((error?.code === "AGENT_RATE_LIMIT" || error?.code === "AGENT_TIMEOUT")
         && (config.model || "").includes("3.8")
         && isGeminiEndpoint(config.baseUrl)) {
-      console.warn(`[Comnyang] falling back from ${config.model} to gemini-3.5-flash-lite due to ${error.code}`);
+      console.warn(`[Furry] falling back from ${config.model} to gemini-3.5-flash-lite due to ${error.code}`);
       payload = await requestModel(messages, {
         model: "gemini-3.5-flash-lite",
         maxTokens: GEMINI_TOKEN_BUDGET,
@@ -935,17 +1150,17 @@ async function askModel(prompt) {
   const action = normalizeAction(parsed?.action);
   if (action?.type === "check_classroom") {
     const classroomResult = await handleCheckClassroom(userMessage);
-    return buildActionResultReply(userMessage, reply, action, classroomResult);
+    return withNote(buildActionResultReply(userMessage, reply, action, classroomResult));
   }
   const internalResult = applyInternalAction(action);
   if (isAutoOpenAction(action) && hasExplicitOpenIntent(userMessage)) {
     const result = await executeOpenAction(action);
-    return buildActionResultReply(userMessage, reply, action, result);
+    return withNote(buildActionResultReply(userMessage, reply, action, result));
   }
   if (!internalResult && hasApprovalGrant(action)) {
-    return buildActionResultReply(userMessage, reply, action, await executeAction(action, "", "always"));
+    return withNote(buildActionResultReply(userMessage, reply, action, await executeAction(action, "", "always")));
   }
-  return buildAgentReply(userMessage, reply, action, internalResult);
+  return withNote(buildAgentReply(userMessage, reply, action, internalResult));
 }
 
 function expandUserPath(value) {
@@ -1135,6 +1350,102 @@ ipcMain.handle("agent-memory-delete", (_event, id) => {
 });
 ipcMain.handle("agent-panel-set-open", setPanelOpen);
 
+try {
+  ipcMain.handle("planner-tasks-get", () => {
+    loadState();
+    const planner = require("./planner-lite");
+    return tasks.filter((t) => !t.completed).map((t) => planner.getInstance().normalizeTask(t));
+  });
+
+  ipcMain.handle("planner-task-add", (_event, data) => {
+    loadState();
+    const planner = require("./planner-lite");
+    const rawTitle = String(data?.title || "").trim();
+    if (!rawTitle) return { ok: false, error: "Empty title" };
+    const size = data?.size || "Small";
+    const deadline = data?.deadline || null;
+    const extraInfo = data?.extraInfo || "";
+    const notify = typeof data?.notify === "boolean" ? data.notify : Boolean(deadline);
+    const task = {
+      id: `task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      title: planner.sanitizeForbiddenWords(rawTitle),
+      deadline: deadline ? String(deadline).trim() : null,
+      size: size,
+      extraInfo: extraInfo ? planner.sanitizeForbiddenWords(String(extraInfo).trim()) : "",
+      notify,
+      lastNotifiedDate: null,
+      completed: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    tasks.push(task);
+    saveTasks();
+    broadcastTasksUpdated();
+    runDueTasksCheck();
+    return { ok: true, task: planner.getInstance().normalizeTask(task) };
+  });
+
+  ipcMain.handle("planner-task-update", (_event, payload) => {
+    loadState();
+    const planner = require("./planner-lite");
+    const id = payload?.id;
+    const updates = payload?.updates || {};
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return { ok: false, error: "Not found" };
+
+    if (typeof updates.title === "string" && updates.title.trim()) {
+      task.title = planner.sanitizeForbiddenWords(updates.title.trim());
+    }
+    if (typeof updates.deadline !== "undefined") {
+      task.deadline = updates.deadline ? String(updates.deadline).trim() : null;
+    }
+    if (typeof updates.size === "string") {
+      task.size = planner.normalizeTaskSize(updates.size);
+      task.minutes = planner.SIZE_MINUTES[task.size];
+    }
+    if (typeof updates.extraInfo !== "undefined") {
+      task.extraInfo = updates.extraInfo ? planner.sanitizeForbiddenWords(String(updates.extraInfo).trim()) : "";
+    }
+    if (typeof updates.notify !== "undefined") {
+      task.notify = Boolean(updates.notify);
+    }
+    if (typeof updates.completed === "boolean") {
+      task.completed = updates.completed;
+    }
+    task.updatedAt = new Date().toISOString();
+    saveTasks();
+    broadcastTasksUpdated();
+    runDueTasksCheck();
+    return { ok: true, task: planner.getInstance().normalizeTask(task) };
+  });
+
+  ipcMain.handle("planner-task-delete", (_event, id) => {
+    loadState();
+    const before = tasks.length;
+    tasks = tasks.filter((t) => t.id !== id);
+    if (tasks.length !== before) {
+      saveTasks();
+      broadcastTasksUpdated();
+      return { ok: true };
+    }
+    return { ok: false };
+  });
+
+  ipcMain.handle("planner-today-pick", (_event, params) => {
+    loadState();
+    const planner = require("./planner-lite");
+    const catEnergy = require("./cat-energy");
+    const level = Number(params?.energyLevel) || catEnergy.getEnergyLevel();
+    const normalizedTasks = tasks.filter((t) => !t.completed).map((t) => planner.getInstance().normalizeTask(t));
+    const pick = planner.pickTask(level, normalizedTasks);
+    const heavyWarning = planner.checkHeavyWeek(level, normalizedTasks);
+    return {
+      ...pick,
+      heavyWarning: heavyWarning.warn ? heavyWarning : null,
+    };
+  });
+} catch (_) {}
+
 async function handleRpc(method, payload) {
   if (method === "state-get") return getPublicState();
   if (method === "config-set") {
@@ -1235,13 +1546,116 @@ const rpcServer = http.createServer(async (request, response) => {
   });
 });
 rpcServer.on("error", (error) => {
-  console.warn("[Comnyang] agent RPC server unavailable:", error.message);
+  console.warn("[Furry] agent RPC server unavailable:", error.message);
 });
 rpcServer.listen(requestedRpcPort, "127.0.0.1", () => {
   const address = rpcServer.address();
   if (address && typeof address === "object") rpcPort = address.port;
-  console.log(`[Comnyang] personal agent RPC listening on 127.0.0.1:${rpcPort}`);
+  console.log(`[Furry] personal agent RPC listening on 127.0.0.1:${rpcPort}`);
 });
 app.on("will-quit", () => {
   if (rpcServer.listening) rpcServer.close();
 });
+
+function getStudentTaskTinyStep(energyLevel = 3) {
+  loadState();
+  let taskList = [];
+
+  // 1. Check recent conversation history for tasks told by student
+  for (let i = history.length - 1; i >= 0; i--) {
+    const msg = history[i];
+    if (msg && msg.role === "user" && catEnergy.isTaskPrioritizationRequest(msg.content)) {
+      const extracted = catEnergy.extractTaskItems(msg.content);
+      if (extracted.length > 0) {
+        taskList = extracted;
+        break;
+      }
+    }
+  }
+
+  // 2. Fallback to open tasks in tasks.json
+  if (taskList.length === 0 && tasks && tasks.length > 0) {
+    taskList = tasks
+      .filter((t) => !t.completed)
+      .map((t) => t.title.replace(/^\[Classroom\]\s*[^:]+:\s*/i, "").trim());
+  }
+
+  const num = Number(energyLevel) || 3;
+  const info = catEnergy.getEnergyInfo(num) || { level: 3, name: "Chill", emoji: "😸" };
+
+  if (taskList.length === 0) {
+    return {
+      hasTasks: false,
+      energyInfo: info,
+    };
+  }
+
+  const result = catEnergy.prioritizeTasks(taskList.join("\n"), num);
+  const topTask = result.prioritized[0] || taskList[0];
+  const tinyStep = result.strategy?.tinyStep || catEnergy.generateConcreteTinyStep(topTask, num);
+
+  return {
+    hasTasks: true,
+    topTask,
+    tinyStep,
+    prioritized: result.prioritized,
+    energyInfo: info,
+  };
+}
+
+let tinyStepAIInstance = null;
+function getTinyStepAI() {
+  if (!tinyStepAIInstance) {
+    try {
+      const { TinyStepAI } = require("./tiny-step-ai");
+      const modelClient = require("./agent-model-client");
+      tinyStepAIInstance = new TinyStepAI({
+        modelClient,
+        configProvider: () => {
+          loadState();
+          return {
+            baseUrl: config.baseUrl,
+            model: config.model,
+            apiKey: config.apiKey,
+          };
+        },
+        fetch: (url, opts) => (typeof net !== "undefined" && net && net.fetch ? net.fetch(url, opts) : globalThis.fetch(url, opts)),
+      });
+    } catch (e) {
+      console.warn("[agent-main] Failed to initialize TinyStepAI:", e?.message);
+    }
+  }
+  return tinyStepAIInstance;
+}
+
+try {
+  ipcMain.handle("student-tiny-step-get", (_e, level) => getStudentTaskTinyStep(level));
+} catch (_) {}
+
+try {
+  ipcMain.handle("tiny-step-ai-generate", async (_e, params) => {
+    const ai = getTinyStepAI();
+    if (!ai) {
+      const { DEFAULT_OFFLINE_STEPS } = require("./tiny-step-ai");
+      const lvl = Number(params?.energyLevel) || 3;
+      return {
+        isSafetyResponse: false,
+        step: DEFAULT_OFFLINE_STEPS[lvl]?.step || DEFAULT_OFFLINE_STEPS[3].step,
+        matchedTrick: null,
+        energyLevel: lvl,
+      };
+    }
+    return await ai.getTinyStep(params || {});
+  });
+} catch (_) {}
+
+if (typeof module !== "undefined" && module.exports) {
+  module.exports = {
+    isTaskPrioritizationRequest,
+    prioritizeTasksLocally,
+    getStudentTaskTinyStep,
+    buildSystemPrompt,
+    getTinyStepAI,
+  };
+}
+

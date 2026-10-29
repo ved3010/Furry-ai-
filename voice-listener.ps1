@@ -10,13 +10,15 @@ Add-Type -AssemblyName System.Speech
 try {
     $recognizer = New-Object System.Speech.Recognition.SpeechRecognitionEngine
     $recognizer.SetInputToDefaultAudioDevice()
+    $recognizer.EndSilenceTimeout = [TimeSpan]::FromSeconds(1.5)
+    $recognizer.EndSilenceTimeoutAmbiguous = [TimeSpan]::FromSeconds(1.5)
 
     $script:currentCatName = ""
     $script:lastSettingsMod = [DateTime]::MinValue
 
     function Load-CatGrammar([string]$nameToLoad) {
         $clean = $nameToLoad.Trim().ToLower()
-        if (-not $clean) { $clean = "comnyang" }
+        if (-not $clean) { $clean = "furry" }
         if ($clean -eq $script:currentCatName) { return }
 
         $script:currentCatName = $clean
@@ -43,7 +45,7 @@ try {
             "kittu",
             "hey kittu",
             "kitty",
-            "comnyang",
+            "furry",
             "bheduu",
             "hey bheduu"
         )
@@ -208,7 +210,7 @@ try {
 
         try {
             $result = $recognizer.Recognize((New-Object TimeSpan(0, 0, 1)))
-            if ($result -ne $null -and $result.Text.Trim() -ne "") {
+            if ($result -ne $null -and $result.Text.Trim() -ne "" -and $result.Confidence -ge 0.50) {
                 [Console]::WriteLine($result.Text.Trim())
             }
         } catch {
