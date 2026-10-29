@@ -366,7 +366,8 @@
   async function submitQuestion(event) {
     event?.preventDefault();
     const prompt = searchInput.value.trim();
-    if (!prompt || busy || panel.hidden) return;
+    if (!prompt || busy) return;
+    if (panel.hidden) showBar();
 
     // Commit previous turn into history if present
     const previousReply = responseText.textContent.trim();
@@ -386,7 +387,7 @@
         throw new Error("The agent did not supply a valid approval request. Please Retry.");
       }
       finishOperation(id);
-      if (searchInput.value.trim() === prompt) searchInput.value = "";
+      if (searchInput.value.trim() === prompt || !busy) searchInput.value = "";
       showResponse(result.reply || "Done.", { status: result.confirmationRequired ? "Permission needed" : "Reply" });
       window.catPet?.setThinking?.(false);
       window.catPet?.meow?.();
@@ -506,13 +507,13 @@
     }
   }
 
-  function isInside(element, point) {
+  function isInside(element, point, margin = 8) {
     if (!point || !element || element.closest("[hidden], [inert]")) return false;
     const style = getComputedStyle(element);
     if (style.display === "none" || style.visibility === "hidden" || style.pointerEvents === "none" || style.opacity === "0") return false;
     const rect = element.getBoundingClientRect();
-    return rect.width > 0 && rect.height > 0 && point.clientX >= rect.left && point.clientX <= rect.right
-      && point.clientY >= rect.top && point.clientY <= rect.bottom;
+    return rect.width > 0 && rect.height > 0 && point.clientX >= (rect.left - margin) && point.clientX <= (rect.right + margin)
+      && point.clientY >= (rect.top - margin) && point.clientY <= (rect.bottom + margin);
   }
 
   function syncInteraction() {
@@ -530,11 +531,16 @@
   }
 
   searchForm.addEventListener("submit", submitQuestion);
-  get("agent-search-hide").addEventListener("click", () => hideBar(true));
+  const searchHideBtn = get("agent-search-hide");
+  const onHideBar = () => hideBar(true);
+  searchHideBtn.addEventListener("click", onHideBar);
+  searchHideBtn.addEventListener("pointerdown", onHideBar);
+  searchHideBtn.addEventListener("mousedown", onHideBar);
   searchToggle.addEventListener("click", () => showBar(true));
   searchSettings.addEventListener("click", () => setSettingsOpen(settingsPopover.hidden, true));
   get("agent-settings-close").addEventListener("click", () => setSettingsOpen(false, true));
-  get("agent-response-close").addEventListener("click", () => {
+  const responseCloseBtn = get("agent-response-close");
+  const onResponseClose = () => {
     if (busy) return hideBar(true);
     clearResponseTimer();
     clearApproval();
@@ -542,7 +548,29 @@
     responseText.textContent = "";
     searchInput.focus();
     syncInteraction();
+  };
+  responseCloseBtn.addEventListener("click", onResponseClose);
+  responseCloseBtn.addEventListener("pointerdown", onResponseClose);
+  responseCloseBtn.addEventListener("mousedown", onResponseClose);
+
+  const keepActive = () => {
+    if (!interactionActive) {
+      interactionActive = true;
+      if (window.agentAPI?.setInteractionActive) window.agentAPI.setInteractionActive(true);
+      else window.electronAPI?.setMouseEventsEnabled?.(true);
+    }
+  };
+  [searchShell, responsePanel, settingsPopover].forEach((el) => {
+    if (!el) return;
+    el.addEventListener("mouseenter", keepActive);
+    el.addEventListener("pointerenter", keepActive);
   });
+  responsePanel.addEventListener("wheel", (e) => {
+    e.stopPropagation();
+    if (responseScroll) {
+      responseScroll.scrollTop += e.deltaY;
+    }
+  }, { passive: true });
   retryButton.addEventListener("click", () => {
     if (!failedPrompt || busy) return;
     const prompt = failedPrompt;

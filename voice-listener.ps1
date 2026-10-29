@@ -18,7 +18,7 @@ try {
 
     function Load-CatGrammar([string]$nameToLoad) {
         $clean = $nameToLoad.Trim().ToLower()
-        if (-not $clean) { $clean = "comnyang" }
+        if (-not $clean) { $clean = "furry" }
         if ($clean -eq $script:currentCatName) { return }
 
         $script:currentCatName = $clean
@@ -45,7 +45,7 @@ try {
             "kittu",
             "hey kittu",
             "kitty",
-            "comnyang",
+            "furry",
             "bheduu",
             "hey bheduu"
         )

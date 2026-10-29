@@ -1,4 +1,4 @@
-# Cattuu / Comnyang personal agent
+# Cattuu / Furry personal agent
 
 The desktop cat includes a compact black-and-white assistant for chat, memories,
 tasks, reminders, Unstop shortcuts, music search, and approved desktop actions.

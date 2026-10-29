@@ -270,9 +270,17 @@
     });
   }
 
-  // Live Auto-Refresh when tasks are updated (e.g. from chat)
-  window.electronAPI?.onPlannerTasksChanged?.(() => {
-    refreshTasks();
+  // Sensory settings (Soft colors)
+  function applySensorySettings(settings) {
+    if (!settings) return;
+    document.body.classList.toggle("soft-colors", Boolean(settings.softColors));
+  }
+
+  if (window.electronAPI?.sensorySettingsGet) {
+    window.electronAPI.sensorySettingsGet().then(applySensorySettings).catch(() => {});
+  }
+  window.electronAPI?.onSensorySettingsChanged?.((settings) => {
+    applySensorySettings(settings);
   });
 
   refreshTasks();

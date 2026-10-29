@@ -53,7 +53,7 @@ function inferShortcut(message) {
   if (/^(?:thanks|thank you|thx)[!. ]*$/i.test(text)) return result("You're welcome! Let me know what you need next.");
   if (/^(?:who are you|what are you)[?.! ]*$/i.test(text)) return result("I'm your personal desktop cat assistant. I can answer questions, explain ideas, help plan work, remember things you ask me to remember, and handle approved desktop tasks.");
   if (/^(?:how are you|how's it going)[?.! ]*$/i.test(text)) return result("I'm ready and listening. Tell me what you need help with.");
-  if (/^(?:list|show)(?: my)? (?:open )?tasks[?.!]*$/i.test(text) || /^my tasks[?.!]*$/i.test(text)) {
+  if (/^(?:list|show|what are|view|check)(?: my)? (?:open )?tasks[?.!]*$/i.test(text) || /^my tasks[?.!]*$/i.test(text)) {
     return result("", { type: "list_tasks" });
   }
   if (/^(?:list|show)(?: my)? reminders[?.!]*$/i.test(text)) return result("", { type: "list_reminders" });

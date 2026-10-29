@@ -99,7 +99,7 @@
         if (window.electronAPI?.energySet) {
           try { await window.electronAPI.energySet(lvl); } catch (_) {}
         }
-        await showTodaysPick(lvl);
+        goToMainChatWithEnergy(lvl);
       });
 
       btn.addEventListener("mouseenter", () => {
@@ -115,7 +115,7 @@
         if (window.electronAPI?.energySkip) {
           try { await window.electronAPI.energySkip(); } catch (_) {}
         }
-        await showTodaysPick(3);
+        goToMainChatWithEnergy(3);
       });
 
       skipBtn.addEventListener("mouseenter", () => {
@@ -405,42 +405,7 @@
   }
 
   async function showTodaysPick(level = 3) {
-    if (!bubble) return;
-    isPromptOpen = true;
-    isInteractiveFlow = true;
-    setPromptMouseEvents(true);
-
-    const num = Math.max(1, Math.min(5, Number(level) || 3));
-    const info = ENERGY_OPTIONS.find((o) => o.level === num) || ENERGY_OPTIONS[2];
-
-    bubble.innerHTML = `
-      <div class="tiny-step-ai-container" style="max-width: 275px; text-align: center; padding: 12px 0;">
-        <div style="font-size: 13px; color: #ffffff; opacity: 0.95;">
-          🐾 Picking today's best task for ${info.name}...
-        </div>
-      </div>
-    `;
-
-    let pickResult = null;
-    try {
-      if (window.electronAPI?.plannerTodayPick) {
-        pickResult = await window.electronAPI.plannerTodayPick({ energyLevel: num });
-      }
-    } catch (err) {
-      console.warn("[gentle-checkin-ui] plannerTodayPick error:", err);
-    }
-
-    if (!pickResult) {
-      pickResult = {
-        task: null,
-        isRestFine: true,
-        message: "Rest is fine today",
-        energyLevel: num,
-        heavyWarning: null,
-      };
-    }
-
-    renderTodaysPickView(pickResult, num, info);
+    goToMainChatWithEnergy(level);
   }
 
   function renderTodaysPickView(pickResult, level, info) {
@@ -570,6 +535,10 @@
 
   function goToMainChatWithEnergy(level) {
     hideCheckInBubble(true);
+    if (bubble) {
+      bubble.textContent = "";
+      bubble.innerHTML = "";
+    }
     if (window.electronAPI?.gentleCheckInRespond) {
       window.electronAPI.gentleCheckInRespond("yes_picked");
     }
@@ -693,7 +662,7 @@
   });
 
   window.electronAPI?.onGentleCheckInShowPick?.((data) => {
-    showTodaysPick(data?.energyLevel);
+    goToMainChatWithEnergy(data?.energyLevel || 3);
   });
 
   window.electronAPI?.onGentleCheckInHide?.(() => {

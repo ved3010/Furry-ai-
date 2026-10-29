@@ -1916,3 +1916,140 @@ body.dragging #jump-ing,
 body.dragging #stretch-pose-default,
 body.dragging #stretch-pose-ing { display: none; }
 body.dragging #stretch-svg-end { display: block; }
+
+/* Sensory Settings: Calm Motion */
+body[data-calm-motion] #cat-speech-bubble-container {
+  transition: none !important;
+  animation: none !important;
+}
+
+body[data-calm-motion] #cat-speech-bubble {
+  animation: none !important;
+  transition: none !important;
+  transform: none !important;
+}
+
+body[data-calm-motion] .paw-thought-bubble {
+  animation: none !important;
+  transform: none !important;
+}
+
+body[data-calm-motion] #purr-hearts,
+body[data-calm-motion] #heat-steam {
+  display: none !important;
+  animation: none !important;
+}
+
+body[data-calm-motion] .purr-heart,
+body[data-calm-motion] .steam-particle,
+body[data-calm-motion] #cat-thinking-dots span {
+  animation: none !important;
+}
+
+body[data-calm-motion] #press-left,
+body[data-calm-motion] #press-right,
+body[data-calm-motion] #scroll-unroll,
+body[data-calm-motion] #jump-start,
+body[data-calm-motion] #jump-ing {
+  display: none !important;
+}
+
+body[data-calm-motion] #cat {
+  display: block !important;
+  animation: none !important;
+  transform: none !important;
+}
+
+/* Sensory Settings: Soft Colors (muted, lower-contrast check-in bubble) */
+body[data-soft-colors] #cat-speech-bubble {
+  background: #24262c !important;
+  color: #c8cbd2 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+body[data-soft-colors] #cat-speech-bubble::before {
+  border-top-color: #24262c !important;
+}
+
+body[data-soft-colors][data-speech="gentle-prompt"] #cat-speech-bubble::before,
+body[data-soft-colors][data-speech="gentle-energy"] #cat-speech-bubble::before {
+  border-right-color: #24262c !important;
+}
+
+body[data-soft-colors] .paw-thought-bubble {
+  background: #24262c !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
+}
+
+body[data-soft-colors] .gentle-checkin-text,
+body[data-soft-colors] .gentle-energy-title,
+body[data-soft-colors] .energy-label {
+  color: #c8cbd2 !important;
+}
+
+body[data-soft-colors] #cat-speech-bubble .gentle-energy-btn,
+body[data-soft-colors] .gentle-energy-btn {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #b0b4bd !important;
+}
+
+body[data-soft-colors] #cat-speech-bubble .gentle-energy-btn:hover,
+body[data-soft-colors] .gentle-energy-btn:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border-color: rgba(255, 255, 255, 0.25) !important;
+  color: #e2e4e9 !important;
+}
+
+body[data-soft-colors] #cat-speech-bubble .gentle-energy-btn.selected,
+body[data-soft-colors] .gentle-energy-btn.selected {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #f0f2f5 !important;
+  border-color: rgba(255, 255, 255, 0.35) !important;
+  box-shadow: none !important;
+}
+
+body[data-soft-colors] #cat-speech-bubble .gentle-energy-skip,
+body[data-soft-colors] .gentle-energy-skip {
+  color: rgba(255, 255, 255, 0.45) !important;
+}
+
+body[data-soft-colors] #cat-speech-bubble .gentle-checkin-btn.btn-yes,
+body[data-soft-colors] #cat-speech-bubble button.gentle-checkin-btn.btn-yes,
+body[data-soft-colors] #cat-speech-bubble .gentle-checkin-btn.btn-accent,
+body[data-soft-colors] #cat-speech-bubble button.gentle-checkin-btn.btn-accent,
+body[data-soft-colors] .gentle-checkin-btn.btn-yes,
+body[data-soft-colors] .gentle-checkin-btn.btn-accent {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: #f0f2f5 !important;
+  border-color: rgba(255, 255, 255, 0.3) !important;
+  box-shadow: none !important;
+}
+
+body[data-soft-colors] #cat-speech-bubble .gentle-checkin-btn.btn-yes:hover,
+body[data-soft-colors] #cat-speech-bubble button.gentle-checkin-btn.btn-yes:hover,
+body[data-soft-colors] #cat-speech-bubble .gentle-checkin-btn.btn-accent:hover,
+body[data-soft-colors] #cat-speech-bubble button.gentle-checkin-btn.btn-accent:hover,
+body[data-soft-colors] .gentle-checkin-btn.btn-yes:hover,
+body[data-soft-colors] .gentle-checkin-btn.btn-accent:hover {
+  background: rgba(255, 255, 255, 0.25) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+  box-shadow: none !important;
+}
+
+body[data-soft-colors] #cat-speech-bubble .gentle-checkin-btn.btn-no,
+body[data-soft-colors] #cat-speech-bubble button.gentle-checkin-btn.btn-no,
+body[data-soft-colors] .gentle-checkin-btn.btn-no {
+  background: rgba(255, 255, 255, 0.06) !important;
+  color: #a2a6b0 !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+body[data-soft-colors] .tiny-step-text-input {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  color: #c8cbd2 !important;
+}
+

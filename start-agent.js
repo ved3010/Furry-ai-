@@ -52,7 +52,7 @@ app.whenReady().then(() => {
         editorWin = new BrowserWindow({
           width: 900,
           height: 720,
-          title: "Comnyang Dev - Desktop Companion & Pattern Editor",
+          title: "Furry Dev - Desktop Companion & Pattern Editor",
           backgroundColor: "#1e1e1e",
           icon: path.join(__dirname, "assets", "comnyang-logo.png"),
           webPreferences: {
@@ -66,7 +66,7 @@ app.whenReady().then(() => {
         editorWin.show();
         editorWin.focus();
         editorWin.moveTop();
-        console.log("[Comnyang] Editor window opened!");
+        console.log("[Furry] Editor window opened!");
       }
 
       // Also ensure the desktop pet has taskbar enabled and is centered

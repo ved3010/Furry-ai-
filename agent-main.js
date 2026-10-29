@@ -459,7 +459,7 @@ function isGeminiEndpoint(value) {
 function logModelFailure(operation, error) {
   // Keep diagnostics useful without logging prompts, response bodies, URLs with
   // credentials, or any part of the API key.
-  console.warn("[Comnyang] agent model failure", {
+  console.warn("[Furry] agent model failure", {
     operation,
     code: error?.code || "model-error",
     status: error?.status,
@@ -646,8 +646,12 @@ function formatReminders() {
 
 function formatTasks() {
   const openTasks = tasks.filter((item) => !item.completed);
-  if (!openTasks.length) return "You don't have any open tasks.";
-  return openTasks.map((item) => `• ${item.id}: ${item.title}`).join("\n");
+  if (!openTasks.length) return "You don't have any open tasks in My tasks.";
+  return `Here are your open tasks in **My tasks**:\n` + openTasks.map((item) => {
+    const due = item.deadline ? ` (Due: ${item.deadline})` : "";
+    const size = item.size ? ` · ${item.size}` : "";
+    return `• **${item.title}**${due}${size}`;
+  }).join("\n");
 }
 
 function applyInternalAction(action) {
@@ -985,7 +989,7 @@ function notifyCatSpeech(text) {
     const { BrowserWindow, Notification } = require("electron");
     try {
       if (Notification && typeof Notification.isSupported === "function" && Notification.isSupported()) {
-        new Notification({ title: "Comnyang", body: text.replace(/^🐾\s*/, "") }).show();
+        new Notification({ title: "Furry", body: text.replace(/^🐾\s*/, "") }).show();
       }
     } catch (_) {}
     BrowserWindow.getAllWindows().forEach((win) => {
@@ -1067,7 +1071,9 @@ async function askModel(prompt) {
   if (!userMessage) return { ok: false, reason: "empty" };
 
   // Sync any tasks/deadlines mentioned by the user to My tasks
-  const addedTasks = syncChatTasksToPlanner(userMessage);
+  // Sync tasks to planner silently without displaying
+  syncChatTasksToPlanner(userMessage);
+  let addedTasks = [];
   let savedTasksNote = "";
   if (addedTasks.length > 0) {
     const listBullets = addedTasks.map((t) => {
@@ -1078,7 +1084,7 @@ async function askModel(prompt) {
   }
 
   const withNote = (result) => {
-    if (savedTasksNote && result?.reply && !result.reply.includes("stored") && !result.reply.includes("My tasks")) {
+    if (false) {
       return { ...result, reply: result.reply + savedTasksNote };
     }
     return result;
@@ -1122,14 +1128,14 @@ async function askModel(prompt) {
     });
   } catch (error) {
     if (isTaskPrioritizationRequest(userMessage)) {
-      console.warn("[Comnyang] model request failed, falling back to local energy task prioritization:", error?.message);
+      console.warn("[Furry] model request failed, falling back to local energy task prioritization:", error?.message);
       const localResult = prioritizeTasksLocally(userMessage, catEnergy.getEnergyLevel());
       return withNote(buildAgentReply(userMessage, localResult.reply, null));
     }
     if ((error?.code === "AGENT_RATE_LIMIT" || error?.code === "AGENT_TIMEOUT")
         && (config.model || "").includes("3.8")
         && isGeminiEndpoint(config.baseUrl)) {
-      console.warn(`[Comnyang] falling back from ${config.model} to gemini-3.5-flash-lite due to ${error.code}`);
+      console.warn(`[Furry] falling back from ${config.model} to gemini-3.5-flash-lite due to ${error.code}`);
       payload = await requestModel(messages, {
         model: "gemini-3.5-flash-lite",
         maxTokens: GEMINI_TOKEN_BUDGET,
@@ -1540,12 +1546,12 @@ const rpcServer = http.createServer(async (request, response) => {
   });
 });
 rpcServer.on("error", (error) => {
-  console.warn("[Comnyang] agent RPC server unavailable:", error.message);
+  console.warn("[Furry] agent RPC server unavailable:", error.message);
 });
 rpcServer.listen(requestedRpcPort, "127.0.0.1", () => {
   const address = rpcServer.address();
   if (address && typeof address === "object") rpcPort = address.port;
-  console.log(`[Comnyang] personal agent RPC listening on 127.0.0.1:${rpcPort}`);
+  console.log(`[Furry] personal agent RPC listening on 127.0.0.1:${rpcPort}`);
 });
 app.on("will-quit", () => {
   if (rpcServer.listening) rpcServer.close();

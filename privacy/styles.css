@@ -269,3 +269,130 @@ input:checked + .slider::before {
   outline: 2px solid var(--focus-ring);
   outline-offset: 2px;
 }
+
+/* Sensory Comfort Card */
+.sensory-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-card);
+  border-radius: 16px;
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.25);
+  transition: border-color 0.2s ease;
+}
+
+.sensory-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.sensory-header {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.sensory-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.sensory-subtitle {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.sensory-toggle-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sensory-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.sensory-info {
+  flex: 1;
+}
+
+.sensory-label-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.sensory-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.sensory-desc {
+  font-size: 13px;
+  color: var(--text-muted);
+  line-height: 1.4;
+}
+
+/* Soft Colors: Muted, lower-contrast style for Privacy panel */
+body.soft-colors {
+  background-color: #1e1f23;
+  color: #c4c5cc;
+}
+
+body.soft-colors .control-card,
+body.soft-colors .sensory-card,
+body.soft-colors .statement-card,
+body.soft-colors .header-icon {
+  background: #25262c;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+
+body.soft-colors .header-text h1,
+body.soft-colors .control-title,
+body.soft-colors .sensory-title,
+body.soft-colors .sensory-name {
+  color: #d8d9de;
+}
+
+body.soft-colors .header-subtitle,
+body.soft-colors .control-description,
+body.soft-colors .sensory-subtitle,
+body.soft-colors .sensory-desc,
+body.soft-colors .statement-text {
+  color: #9da0aa;
+}
+
+body.soft-colors .statement-num {
+  background: #2b2c34;
+  color: #9da0aa;
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+body.soft-colors .close-btn {
+  background: #2b2c34;
+  color: #d8d9de;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+body.soft-colors .status-badge.on {
+  background: rgba(16, 185, 129, 0.12);
+  color: #6ee7b7;
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+body.soft-colors .status-badge.off {
+  background: rgba(160, 160, 171, 0.12);
+  color: #a0a0ab;
+  border-color: rgba(160, 160, 171, 0.2);
+}
+

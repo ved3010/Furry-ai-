@@ -67,7 +67,11 @@ function getDefaultStoragePath() {
     (process.platform === "darwin"
       ? path.join(os.homedir(), "Library", "Application Support")
       : path.join(os.homedir(), ".config"));
-  return path.join(appData, "Comnyang Dev", "settings.json");
+  const furryPath = path.join(appData, "Furry Dev", "settings.json");
+  if (fs.existsSync(furryPath)) return furryPath;
+  const legacyPath = path.join(appData, "Comnyang Dev", "settings.json");
+  if (fs.existsSync(legacyPath)) return legacyPath;
+  return furryPath;
 }
 
 function loadSettings() {

@@ -80,8 +80,13 @@
           if (window.voiceAPI?.transcribeAudio) {
             const result = await window.voiceAPI.transcribeAudio(arrayBuffer, mimeType);
             if (result?.ok && result.text) {
-              if (searchInput) {
-                searchInput.value = result.text;
+              const text = result.text.trim();
+              if (text && searchInput) {
+                searchInput.value = text;
+                const searchForm = document.getElementById("agent-search-form");
+                if (searchForm) {
+                  searchForm.dispatchEvent(new Event("submit", { cancelable: true }));
+                }
               }
             } else if (result?.error === "MISSING_KEY") {
               showBubble("Paste Groq key in .env file! 🔑", 4000);

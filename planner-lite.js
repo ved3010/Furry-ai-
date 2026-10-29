@@ -668,6 +668,56 @@ function inferTaskSize(title, fullText = "") {
   return TASK_SIZES.MEDIUM;
 }
 
+function cleanTaskTitle(raw) {
+  if (!raw || typeof raw !== "string") return "";
+  let text = raw.trim();
+  if (text.startsWith("[Classroom]") || text.startsWith("[")) return text;
+
+  // Strip question sentences and clauses
+  text = text.replace(/(?:^|[,.!?\n])\s*(?:what (?:should|can|do) i do\??|how (?:can|do) i\b[^,.!?]*\??|can you help\??|what to do\??)\s*[,.!?]?/gi, " ");
+
+  // Strip venting / emotional clauses
+  const ventingPattern = /(?:^|[,.!?\n])\s*(?:i(?:'m| am)? (?:too |so |very )?(?:stressed|overwhelmed|tired|exhausted|anxious|panicking|burnt out|sad|depressed|nervous)|there(?:'s| is) (?:so |too )?much (?:workload|work|pressure|stuff)|i have (?:so |too )?much (?:work|to do)|i don't know what to do)\s*[,.!?\s]*/gi;
+  text = text.replace(ventingPattern, " ").trim();
+
+  // If there are multiple sentences left, find the sentence that actually contains the work/task
+  const sentences = text.split(/\s*[.!?]+\s*/).map(s => s.trim().replace(/^[,,\s;]+|[,,\s;]+$/g, "")).filter(Boolean);
+  if (sentences.length > 1) {
+    const taskSentence = sentences.find(s => /(?:interview|submission|homework|assignment|review|exam|test|quiz|project|presentation|lab|paper|essay|meeting|study|math|discrete|chapter|lecture|problem|task)\b/i.test(s));
+    if (taskSentence) {
+      text = taskSentence;
+    } else {
+      text = sentences[sentences.length - 1];
+    }
+  }
+
+  // Iteratively strip conversational leading filler words
+  let prev;
+  do {
+    prev = text;
+    text = text
+      .replace(/^[-*•]\s*/, "")
+      .replace(/^[\d+]+[\.\)]\s*/, "")
+      .replace(/^[,,\s;]+|[,,\s;]+$/g, "")
+      .replace(/^and\s+/i, "")
+      .replace(/^(?:like\s+(?:one\s+)?|also\s+|maybe\s+|plus\s+|just\s+)/i, "")
+      .replace(/^(?:i\s+(?:have|got|need|want|ought)\s+(?:to\s+)?(?:do\s+|finish\s+|complete\s+)?(?:a\s+|an\s+|the\s+)?)/i, "")
+      .replace(/^(?:there\s+is\s+(?:a\s+|an\s+|the\s+)?)/i, "")
+      .replace(/^(?:one\s+)/i, "")
+      .replace(/\s+/g, " ")
+      .replace(/^[,,\s;]+|[,,\s;]+$/g, "")
+      .replace(/[.!?]+$/, "")
+      .trim();
+  } while (text !== prev);
+
+  if (text.length < 2) return "";
+  if (/^(?:what|how|why|can you|should i|i am|stressed|help|workload|please)\b/i.test(text) && !/(?:interview|submission|homework|assignment|review|exam|test|math|project|lab|paper|study)\b/i.test(text)) {
+    return "";
+  }
+
+  return text;
+}
+
 function extractTasksFromChat(text, now = new Date()) {
   if (!text || typeof text !== "string") return [];
   const trimmed = text.trim();
@@ -743,12 +793,8 @@ function extractTasksFromChat(text, now = new Date()) {
       title = title.replace(/\b(?:by|due|before|on)$/i, "").trim();
     }
 
-    // Clean leading bullets or ordinal numbers
-    title = title
-      .replace(/^[\d+]+[\.\)]\s*/, "")
-      .replace(/^[-*•]\s*/, "")
-      .replace(/^and\s+/i, "")
-      .trim();
+    // Clean leading bullets, conversational phrasing, and emotional venting
+    title = cleanTaskTitle(title);
 
     if (!title) continue;
 
@@ -777,6 +823,7 @@ module.exports = {
   sanitizeForbiddenWords,
   formatDeadlineDate,
   parseDeadlineFromText,
+  cleanTaskTitle,
   inferTaskSize,
   extractTasksFromChat,
   getInstance: () => defaultInstance,
