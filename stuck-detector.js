@@ -27,6 +27,10 @@
  * 9. Exports onStateChange(callback), setWatchingMode, setThinkingMode, stopManualModes, markJustThinking.
  */
 
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+
 const STATES = {
   ACTIVE: "active",
   MAYBE_STUCK: "maybe_stuck",
@@ -44,6 +48,66 @@ const DEMO_NO_KEY_THRESHOLD_MS = 10 * 1000; // 10 seconds in demo mode
 const DEMO_QUESTION_STUCK_THRESHOLD_MS = 15 * 1000; // 15 seconds in demo mode (solving questions)
 const MIN_SWITCHES_FOR_STUCK = 6;
 const POLL_INTERVAL_MS = 1000; // Poll active window every second
+
+let isDetectorEnabled = true;
+let customStoragePath = null;
+
+function getDefaultStoragePath() {
+  if (customStoragePath) return customStoragePath;
+  try {
+    const electron = require("electron");
+    const app = electron.app || electron.remote?.app;
+    if (app && typeof app.getPath === "function") {
+      return path.join(app.getPath("userData"), "settings.json");
+    }
+  } catch (_) {}
+
+  const appData =
+    process.env.APPDATA ||
+    (process.platform === "darwin"
+      ? path.join(os.homedir(), "Library", "Application Support")
+      : path.join(os.homedir(), ".config"));
+  return path.join(appData, "Comnyang Dev", "settings.json");
+}
+
+function loadSettings() {
+  try {
+    const p = getDefaultStoragePath();
+    if (p && fs.existsSync(p)) {
+      const raw = fs.readFileSync(p, "utf8");
+      const json = JSON.parse(raw);
+      if (json && typeof json.stuckDetectionEnabled === "boolean") {
+        isDetectorEnabled = json.stuckDetectionEnabled;
+      }
+    }
+  } catch (_) {}
+}
+
+function saveSettings(enabled) {
+  try {
+    const p = getDefaultStoragePath();
+    if (!p) return;
+    const dir = path.dirname(p);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    let data = {};
+    if (fs.existsSync(p)) {
+      try {
+        data = JSON.parse(fs.readFileSync(p, "utf8")) || {};
+      } catch (_) {
+        data = {};
+      }
+    }
+    data.stuckDetectionEnabled = enabled;
+    fs.writeFileSync(p, JSON.stringify(data, null, 2), "utf8");
+  } catch (err) {
+    console.warn("[StuckDetector] Could not save setting:", err.message);
+  }
+}
+
+// Initial load
+loadSettings();
 
 let currentState = STATES.ACTIVE;
 let lastActivityTime = Date.now(); // Any input or window switch
@@ -76,11 +140,72 @@ let activeWinModule = null;
 const stateListeners = new Set();
 
 /**
+ * Checks whether stuck detection is enabled.
+ * @returns {boolean}
+ */
+function isEnabled() {
+  return isDetectorEnabled;
+}
+
+/**
+ * Enables or disables stuck detection.
+ * When disabled, cancels any manual modes, resets state to ACTIVE,
+ * and clears pending window switches.
+ * 
+ * @param {boolean} enabled
+ * @param {boolean} [persist=true]
+ * @returns {boolean}
+ */
+function setEnabled(enabled, persist = true) {
+  const next = Boolean(enabled);
+  const wasEnabled = isDetectorEnabled;
+  isDetectorEnabled = next;
+  if (persist) {
+    saveSettings(isDetectorEnabled);
+  }
+  if (!isDetectorEnabled) {
+    stopManualModes();
+    windowSwitches = [];
+    if (currentState !== STATES.ACTIVE) {
+      const previousState = currentState;
+      currentState = STATES.ACTIVE;
+      console.log(`[StuckDetector] Disabled. State reset to: ${currentState}`);
+      for (const listener of stateListeners) {
+        try {
+          listener(currentState, previousState, {
+            appType: currentAppType,
+            appName: currentAppName,
+            manualMode: null,
+            isDemoMode,
+            patienceMultiplier,
+            windowSwitchesLast2Min: 0,
+            activityType: lastActivitySource,
+            disabled: true,
+          });
+        } catch (_) {}
+      }
+    }
+  } else if (!wasEnabled) {
+    const now = Date.now();
+    lastActivityTime = now;
+    lastKeyTime = now;
+    evaluateState();
+  }
+  return isDetectorEnabled;
+}
+
+function setStoragePath(customPath) {
+  customStoragePath = customPath;
+  loadSettings();
+}
+
+/**
  * Record keyboard activity timestamp.
  * CRITICAL PRIVACY REQUIREMENT:
  * Record ONLY the timestamp (Date.now()). Never inspect, log, or store key content.
  */
 function recordKeyActivity() {
+  if (!isDetectorEnabled) return;
   lastActivitySource = "keyboard";
   const now = Date.now();
   lastKeyTime = now;
@@ -92,6 +217,7 @@ function recordKeyActivity() {
  * Record non-keyboard activity timestamp (mouse, scroll, etc.).
  */
 function recordOtherActivity() {
+  if (!isDetectorEnabled) return;
   lastActivitySource = "mouse";
   lastActivityTime = Date.now();
   evaluateState();
@@ -441,6 +567,7 @@ function markJustThinking() {
  * @param {number} [minutes=30]
  */
 function setWatchingMode(minutes = 30) {
+  if (!isDetectorEnabled) return;
   const mins = Math.max(1, Number(minutes) || 30);
   manualMode = STATES.WATCHING;
   manualModeExpiresAt = Date.now() + mins * 60 * 1000;
@@ -459,6 +586,7 @@ function setWatchingMode(minutes = 30) {
  * @param {number} [minutes=30]
  */
 function setThinkingMode(minutes = 30) {
+  if (!isDetectorEnabled) return;
   const mins = Math.max(1, Number(minutes) || 30);
   manualMode = STATES.THINKING;
   manualModeExpiresAt = Date.now() + mins * 60 * 1000;
@@ -515,6 +643,7 @@ async function fetchActiveWindow() {
  * Polls the currently active window, counts switches, and updates classification.
  */
 async function pollActiveWindow() {
+  if (!isDetectorEnabled) return;
   const win = await fetchActiveWindow();
   if (!win) return;
 
@@ -564,6 +693,29 @@ async function pollActiveWindow() {
  * @returns {boolean} Whether the state changed
  */
 function evaluateState() {
+  if (!isDetectorEnabled) {
+    if (currentState !== STATES.ACTIVE) {
+      const previousState = currentState;
+      currentState = STATES.ACTIVE;
+      for (const listener of stateListeners) {
+        try {
+          listener(currentState, previousState, {
+            appType: currentAppType,
+            appName: currentAppName,
+            manualMode: null,
+            isDemoMode,
+            patienceMultiplier,
+            windowSwitchesLast2Min: 0,
+            activityType: lastActivitySource,
+            disabled: true,
+          });
+        } catch (_) {}
+      }
+      return true;
+    }
+    return false;
+  }
+
   const now = Date.now();
 
   // Auto-expire manual modes if elapsed
@@ -835,7 +987,11 @@ module.exports = {
   recordKeyActivity,
   recordOtherActivity,
   recordActivity,
+  isEnabled: () => isEnabled(),
+  setEnabled: (enabled, persist) => setEnabled(enabled, persist),
+  setStoragePath,
   _setTestState: (opts = {}) => {
+    if (typeof opts.isDetectorEnabled !== "undefined") isDetectorEnabled = opts.isDetectorEnabled;
     if (typeof opts.currentState !== "undefined") currentState = opts.currentState;
     if (typeof opts.lastActivityTime !== "undefined") lastActivityTime = opts.lastActivityTime;
     if (typeof opts.lastActivityTimestamp !== "undefined") lastActivityTime = opts.lastActivityTimestamp;
@@ -857,3 +1013,4 @@ module.exports = {
     patienceDay = dayStr;
   },
 };
+

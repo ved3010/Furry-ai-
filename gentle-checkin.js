@@ -78,6 +78,13 @@ class GentleCheckIn {
     }
   }
 
+  isEnabled() {
+    if (this.stuckDetector && typeof this.stuckDetector.isEnabled === "function") {
+      return this.stuckDetector.isEnabled();
+    }
+    return true;
+  }
+
   isSilenced() {
     this.checkDayReset();
     if (this.silenceForRestOfDay) return true;
@@ -110,6 +117,11 @@ class GentleCheckIn {
   handleStateChange(newState, previousState, meta = {}) {
     this.checkDayReset();
 
+    if (this.stuckDetector && typeof this.stuckDetector.isEnabled === "function" && !this.stuckDetector.isEnabled()) {
+      this.cancelStage();
+      return;
+    }
+
     // Never show in watching or thinking states
     if (newState === "watching" || newState === "thinking") {
       this.cancelStage();
@@ -120,7 +132,7 @@ class GentleCheckIn {
     if (newState === "active") {
       // If the prompt is currently open with Yes/No buttons, moving mouse to hover/click the button
       // triggers mouse activity that updates detector state to active. We must NOT close the prompt on mouse movement!
-      if (this.currentStage === STAGES.STAGE_PROMPT && meta.activityType === "mouse") {
+      if (this.currentStage === STAGES.STAGE_PROMPT && meta.activityType === "mouse" && !meta.disabled) {
         return;
       }
       this.cancelStage();
@@ -161,6 +173,11 @@ class GentleCheckIn {
   }
 
   startPrompt(force = false) {
+    if (!this.isEnabled()) {
+      this.cancelStage();
+      return;
+    }
+
     this.checkDayReset();
 
     if (!force) {
@@ -371,6 +388,7 @@ module.exports = {
   cancelStage: () => defaultInstance.cancelStage(),
   getStage: () => defaultInstance.getStage(),
   isSilenced: () => defaultInstance.isSilenced(),
+  isEnabled: () => (defaultInstance.stuckDetector?.isEnabled ? defaultInstance.stuckDetector.isEnabled() : true),
   getCheckInsToday: () => defaultInstance.getCheckInsToday(),
   getConsecutiveIgnoredCount: () => defaultInstance.getConsecutiveIgnoredCount(),
 };

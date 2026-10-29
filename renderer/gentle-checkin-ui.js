@@ -504,4 +504,8 @@
   window.electronAPI?.onGentleCheckInPurr?.(() => {
     playPurr();
   });
+
+  window.electronAPI?.onGentleCheckInCancel?.(() => {
+    hideCheckInBubble(true);
+  });
 })();
