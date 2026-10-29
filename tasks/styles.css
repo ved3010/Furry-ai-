@@ -1,0 +1,320 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: #121215;
+  color: #f4f4f6;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+
+.tasks-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  padding: 24px;
+  gap: 18px;
+}
+
+/* Header */
+.tasks-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.header-icon {
+  font-size: 28px;
+  line-height: 1;
+  background: #1e1e28;
+  border: 1px solid #2d2d3d;
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+}
+
+.header-text h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.header-subtitle {
+  font-size: 13px;
+  color: #9d9db0;
+  margin-top: 2px;
+}
+
+/* Form Card */
+.task-form-card {
+  background: #191922;
+  border: 1px solid #282838;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.form-group label {
+  font-size: 12px;
+  font-weight: 600;
+  color: #c4c4d4;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.task-input,
+.task-date-input,
+.task-select {
+  background: #111116;
+  border: 1px solid #2e2e42;
+  color: #ffffff;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.task-input:focus,
+.task-date-input:focus,
+.task-select:focus {
+  border-color: #8b5cf6;
+}
+
+.form-row {
+  display: flex;
+  gap: 12px;
+}
+
+.flex-1 {
+  flex: 1;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+/* Buttons */
+.btn {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 18px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-primary {
+  background: #7c3aed;
+  color: #ffffff;
+}
+
+.btn-primary:hover {
+  background: #6d28d9;
+}
+
+.btn-secondary {
+  background: #242432;
+  color: #e0e0ec;
+  border: 1px solid #36364a;
+}
+
+.btn-secondary:hover {
+  background: #2e2e40;
+}
+
+/* Tasks List Section */
+.tasks-list-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.section-header h2 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #d1d1e0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.count-badge {
+  background: #272738;
+  color: #c4c4dc;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 12px;
+}
+
+.tasks-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+/* Custom Scrollbar */
+.tasks-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tasks-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tasks-list::-webkit-scrollbar-thumb {
+  background: #2b2b3b;
+  border-radius: 3px;
+}
+
+/* Task Item */
+.task-item {
+  background: #1a1a24;
+  border: 1px solid #2a2a3c;
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  transition: border-color 0.15s ease;
+}
+
+.task-item:hover {
+  border-color: #3d3d54;
+}
+
+.task-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+
+.task-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  word-break: break-word;
+}
+
+.task-item-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* Size Badges - zero red! */
+.size-badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+}
+
+.size-badge.size-small {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.size-badge.size-medium {
+  background: rgba(99, 102, 241, 0.15);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+}
+
+.size-badge.size-big {
+  background: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* Deadline Badge - gentle amber/purple, zero red! */
+.deadline-badge {
+  font-size: 11px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: rgba(139, 92, 246, 0.12);
+  color: #c4b5fd;
+  border: 1px solid rgba(139, 92, 246, 0.25);
+}
+
+.deadline-badge.waiting {
+  background: rgba(217, 119, 6, 0.15);
+  color: #fde68a;
+  border: 1px solid rgba(217, 119, 6, 0.3);
+}
+
+/* Delete Button */
+.task-delete-btn {
+  background: #232332;
+  border: 1px solid #353549;
+  color: #a0a0b8;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 13px;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.task-delete-btn:hover {
+  background: #313146;
+  color: #ffffff;
+}
+
+/* Empty State */
+.tasks-empty {
+  text-align: center;
+  padding: 32px 16px;
+  color: #7d7d96;
+  font-size: 14px;
+}
+
+/* Footer */
+.tasks-footer {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 6px;
+}

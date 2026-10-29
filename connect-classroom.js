@@ -32,7 +32,7 @@ if (!wantsSwitch && googleClassroom.isConnected()) {
     res.assignments.forEach((a, i) => {
       console.log(`[${i + 1}] ${a.title}`);
       console.log(`    Course: ${a.courseName}`);
-      console.log(`    Due:    ${a.dueDateFormatted} (${a.isOverdue ? "OVERDUE" : `in ${a.dueInHours} hours`})`);
+      console.log(`    Due:    ${a.dueDateFormatted} (${a.isOverdue ? "waiting for you" : `in ${a.dueInHours} hours`})`);
       console.log(`    Link:   ${a.link}\n`);
     });
     process.exit(0);
@@ -51,7 +51,7 @@ if (!wantsSwitch && googleClassroom.isConnected()) {
       assignmentsRes.assignments.forEach((a, i) => {
         console.log(`[${i + 1}] ${a.title}`);
         console.log(`    Course: ${a.courseName}`);
-        console.log(`    Due:    ${a.dueDateFormatted} (${a.isOverdue ? "OVERDUE" : `in ${a.dueInHours} hours`})`);
+        console.log(`    Due:    ${a.dueDateFormatted} (${a.isOverdue ? "waiting for you" : `in ${a.dueInHours} hours`})`);
         console.log(`    Link:   ${a.link}\n`);
       });
     }

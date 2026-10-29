@@ -1,0 +1,514 @@
+"use strict";
+
+const fs = require("fs");
+const path = require("path");
+const os = require("os");
+
+const TASK_SIZES = {
+  SMALL: "Small",
+  MEDIUM: "Medium",
+  BIG: "Big",
+};
+
+const SIZE_MINUTES = {
+  Small: 15,
+  Medium: 45,
+  Big: 120,
+};
+
+const DAILY_CAPACITIES = {
+  1: 10,
+  2: 30,
+  3: 60,
+  4: 90,
+  5: 120,
+};
+
+const FORBIDDEN_WORDS = ["overdue", "late", "behind", "failed"];
+
+function getDefaultTasksPath() {
+  try {
+    const electron = require("electron");
+    const app = electron.app || electron.remote?.app;
+    if (app && typeof app.getPath === "function") {
+      return path.join(app.getPath("userData"), "agent", "tasks.json");
+    }
+  } catch (_) {}
+
+  const home = os.homedir();
+  let baseDir;
+  if (process.platform === "win32") {
+    baseDir = process.env.APPDATA ? path.join(process.env.APPDATA, "furry") : path.join(home, "AppData", "Roaming", "furry");
+  } else if (process.platform === "darwin") {
+    baseDir = path.join(home, "Library", "Application Support", "furry");
+  } else {
+    baseDir = process.env.XDG_CONFIG_HOME || path.join(home, ".config", "furry");
+  }
+  return path.join(baseDir, "agent", "tasks.json");
+}
+
+function getDefaultPlannerSettingsPath() {
+  try {
+    const electron = require("electron");
+    const app = electron.app || electron.remote?.app;
+    if (app && typeof app.getPath === "function") {
+      return path.join(app.getPath("userData"), "planner-settings.json");
+    }
+  } catch (_) {}
+
+  const home = os.homedir();
+  let baseDir;
+  if (process.platform === "win32") {
+    baseDir = process.env.APPDATA ? path.join(process.env.APPDATA, "furry") : path.join(home, "AppData", "Roaming", "furry");
+  } else if (process.platform === "darwin") {
+    baseDir = path.join(home, "Library", "Application Support", "furry");
+  } else {
+    baseDir = process.env.XDG_CONFIG_HOME || path.join(home, ".config", "furry");
+  }
+  return path.join(baseDir, "planner-settings.json");
+}
+
+function checkNoForbiddenWords(text) {
+  if (!text || typeof text !== "string") return true;
+  const lower = text.toLowerCase();
+  for (const word of FORBIDDEN_WORDS) {
+    if (new RegExp(`\\b${word}\\b`, "i").test(lower)) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function sanitizeForbiddenWords(text) {
+  if (!text || typeof text !== "string") return "";
+  let s = text;
+  s = s.replace(/\boverdue\b/gi, "waiting for you");
+  s = s.replace(/\blate\b/gi, "waiting");
+  s = s.replace(/\bbehind\b/gi, "in progress");
+  s = s.replace(/\bfailed\b/gi, "needs attention");
+  return s;
+}
+
+function normalizeTaskSize(size, isClassroom = false) {
+  if (!size || typeof size !== "string") {
+    return isClassroom ? TASK_SIZES.MEDIUM : TASK_SIZES.SMALL;
+  }
+  const s = size.trim().toLowerCase();
+  if (s.startsWith("small") || s === "15" || s === "15m" || s === "15 min") return TASK_SIZES.SMALL;
+  if (s.startsWith("medium") || s === "45" || s === "45m" || s === "45 min") return TASK_SIZES.MEDIUM;
+  if (s.startsWith("big") || s === "120" || s === "120m" || s === "120 min") return TASK_SIZES.BIG;
+  return isClassroom ? TASK_SIZES.MEDIUM : TASK_SIZES.SMALL;
+}
+
+function getDeadlineTimestamp(task) {
+  const d = task.deadline || task.dueDate;
+  if (!d) return Number.MAX_SAFE_INTEGER;
+  const ts = new Date(d).getTime();
+  return Number.isFinite(ts) ? ts : Number.MAX_SAFE_INTEGER;
+}
+
+function compareDeadline(a, b) {
+  const tsA = getDeadlineTimestamp(a);
+  const tsB = getDeadlineTimestamp(b);
+  if (tsA !== tsB) return tsA - tsB;
+  return (a.createdAt || "").localeCompare(b.createdAt || "") || (a.id || "").localeCompare(b.id || "");
+}
+
+function formatDeadlineDate(deadline, now = new Date()) {
+  if (!deadline) return "";
+  const d = new Date(deadline);
+  if (isNaN(d.getTime())) return "";
+
+  const nowDate = new Date(now);
+  nowDate.setHours(0, 0, 0, 0);
+  const targetDate = new Date(d);
+  targetDate.setHours(0, 0, 0, 0);
+
+  const diffMs = targetDate.getTime() - nowDate.getTime();
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffDays < 0) {
+    // Missed deadline: NEVER say overdue or late! Say 'waiting for you'
+    return "waiting for you";
+  }
+  if (diffDays === 0) {
+    return "Due today";
+  }
+  if (diffDays === 1) {
+    return "Due tomorrow";
+  }
+  return `Due ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+}
+
+class PlannerLite {
+  constructor(options = {}) {
+    this.storagePath = options.storagePath || getDefaultTasksPath();
+    this.settingsPath = options.settingsPath || getDefaultPlannerSettingsPath();
+    this.timeProvider = options.timeProvider || null;
+    this.cachedTasks = null;
+    this.lastWarningDate = null;
+    this.loadSettings();
+  }
+
+  now() {
+    if (typeof this.timeProvider === "function") {
+      return this.timeProvider();
+    }
+    return new Date();
+  }
+
+  setStoragePath(tasksPath, settingsPath) {
+    this.storagePath = tasksPath;
+    if (settingsPath) this.settingsPath = settingsPath;
+    this.cachedTasks = null;
+    this.loadSettings();
+  }
+
+  loadSettings() {
+    try {
+      if (this.settingsPath && fs.existsSync(this.settingsPath)) {
+        const data = JSON.parse(fs.readFileSync(this.settingsPath, "utf8"));
+        if (typeof data.lastHeavyWarningDate === "string") {
+          this.lastWarningDate = data.lastHeavyWarningDate;
+        }
+      }
+    } catch (_) {}
+  }
+
+  saveSettings() {
+    try {
+      if (!this.settingsPath) return;
+      const dir = path.dirname(this.settingsPath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(
+        this.settingsPath,
+        JSON.stringify({ lastHeavyWarningDate: this.lastWarningDate }, null, 2),
+        "utf8"
+      );
+    } catch (_) {}
+  }
+
+  loadTasks() {
+    try {
+      if (this.storagePath && fs.existsSync(this.storagePath)) {
+        const raw = fs.readFileSync(this.storagePath, "utf8");
+        const list = JSON.parse(raw);
+        if (Array.isArray(list)) {
+          this.cachedTasks = list.map((item) => this.normalizeTask(item));
+          return this.cachedTasks;
+        }
+      }
+    } catch (_) {}
+    this.cachedTasks = [];
+    return this.cachedTasks;
+  }
+
+  saveTasks(list) {
+    try {
+      if (!this.storagePath) return;
+      const dir = path.dirname(this.storagePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const items = (Array.isArray(list) ? list : this.cachedTasks || []).map((t) => this.normalizeTask(t));
+      this.cachedTasks = items;
+      fs.writeFileSync(this.storagePath, JSON.stringify(items, null, 2), "utf8");
+    } catch (e) {
+      console.warn("[PlannerLite] Failed to save tasks:", e?.message);
+    }
+  }
+
+  normalizeTask(item) {
+    if (!item || typeof item !== "object") return null;
+    const isClassroom = Boolean(item.classroomId || (item.source && String(item.source).includes("Classroom")));
+    const size = normalizeTaskSize(item.size, isClassroom);
+    const deadline = item.deadline || item.dueDate || null;
+    const rawTitle = String(item.title || "Untitled task").trim();
+    const title = sanitizeForbiddenWords(rawTitle);
+
+    return {
+      id: item.id || `task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      title,
+      deadline,
+      size,
+      minutes: SIZE_MINUTES[size] || 15,
+      completed: Boolean(item.completed),
+      createdAt: item.createdAt || new Date().toISOString(),
+      classroomId: item.classroomId || null,
+      link: item.link || null,
+    };
+  }
+
+  getOpenTasks() {
+    const all = this.loadTasks();
+    return all.filter((t) => t && !t.completed);
+  }
+
+  addTask({ title, deadline = null, size = TASK_SIZES.SMALL }) {
+    const rawTitle = String(title || "").trim();
+    if (!rawTitle) return null;
+    const cleanTitle = sanitizeForbiddenWords(rawTitle);
+    const normalizedSize = normalizeTaskSize(size);
+    const all = this.loadTasks();
+
+    const task = {
+      id: `task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      title: cleanTitle,
+      deadline: deadline ? String(deadline).trim() : null,
+      size: normalizedSize,
+      minutes: SIZE_MINUTES[normalizedSize],
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    all.push(task);
+    this.saveTasks(all);
+    return task;
+  }
+
+  deleteTask(id) {
+    const all = this.loadTasks();
+    const filtered = all.filter((t) => t.id !== id);
+    if (filtered.length !== all.length) {
+      this.saveTasks(filtered);
+      return true;
+    }
+    return false;
+  }
+
+  /**
+   * Pick ONE task according to energy level rules:
+   * - Energy 1: smallest task, or 'Rest is fine today' if there is no small one
+   * - Energy 2: a Small task
+   * - Energy 3: a Medium task or the most urgent Small one
+   * - Energy 4: the most urgent task up to Medium
+   * - Energy 5: the most urgent or biggest task
+   * If two tasks fit equally, choose the earlier deadline.
+   */
+  pickTask(energyLevel = 3, tasksList = null) {
+    const openTasks = (tasksList || this.getOpenTasks()).filter((t) => t && !t.completed);
+    const level = Math.max(1, Math.min(5, Number(energyLevel) || 3));
+
+    if (openTasks.length === 0) {
+      return {
+        task: null,
+        isRestFine: true,
+        message: "Rest is fine today",
+        energyLevel: level,
+      };
+    }
+
+    const smallTasks = openTasks.filter((t) => t.size === TASK_SIZES.SMALL).sort(compareDeadline);
+    const mediumTasks = openTasks.filter((t) => t.size === TASK_SIZES.MEDIUM).sort(compareDeadline);
+    const bigTasks = openTasks.filter((t) => t.size === TASK_SIZES.BIG).sort(compareDeadline);
+
+    let picked = null;
+
+    if (level === 1) {
+      // Energy 1 gives the smallest task, or 'Rest is fine today' if there is no small one
+      if (smallTasks.length > 0) {
+        picked = smallTasks[0];
+        return {
+          task: picked,
+          isRestFine: false,
+          message: null,
+          energyLevel: level,
+        };
+      }
+      return {
+        task: null,
+        isRestFine: true,
+        message: "Rest is fine today",
+        energyLevel: level,
+      };
+    }
+
+    if (level === 2) {
+      // Energy 2 gives a Small task
+      if (smallTasks.length > 0) {
+        picked = smallTasks[0];
+      } else {
+        // Fallback if no small tasks: pick smallest available with earlier deadline
+        picked = mediumTasks.length > 0 ? mediumTasks[0] : (bigTasks[0] || null);
+      }
+      return {
+        task: picked,
+        isRestFine: !picked,
+        message: picked ? null : "Rest is fine today",
+        energyLevel: level,
+      };
+    }
+
+    if (level === 3) {
+      // Energy 3 gives a Medium task or the most urgent Small one
+      const bestMedium = mediumTasks[0] || null;
+      const mostUrgentSmall = smallTasks[0] || null;
+
+      if (bestMedium && mostUrgentSmall) {
+        const smallHasDeadline = getDeadlineTimestamp(mostUrgentSmall) < Number.MAX_SAFE_INTEGER;
+        const medHasDeadline = getDeadlineTimestamp(bestMedium) < Number.MAX_SAFE_INTEGER;
+
+        if (smallHasDeadline && (!medHasDeadline || getDeadlineTimestamp(mostUrgentSmall) < getDeadlineTimestamp(bestMedium))) {
+          // Small task has an earlier deadline
+          picked = mostUrgentSmall;
+        } else {
+          // Medium task has equal or earlier deadline, or neither has deadline
+          picked = bestMedium;
+        }
+      } else if (bestMedium) {
+        picked = bestMedium;
+      } else if (mostUrgentSmall) {
+        picked = mostUrgentSmall;
+      } else {
+        picked = bigTasks[0] || null;
+      }
+
+      return {
+        task: picked,
+        isRestFine: !picked,
+        message: picked ? null : "Rest is fine today",
+        energyLevel: level,
+      };
+    }
+
+    if (level === 4) {
+      // Energy 4 gives the most urgent task up to Medium
+      const upToMedium = [...smallTasks, ...mediumTasks].sort((a, b) => {
+        const diff = compareDeadline(a, b);
+        if (diff !== 0) return diff;
+        // If tied in deadline, prefer Medium for Level 4
+        if (a.size !== b.size) {
+          return a.size === TASK_SIZES.MEDIUM ? -1 : 1;
+        }
+        return 0;
+      });
+
+      if (upToMedium.length > 0) {
+        picked = upToMedium[0];
+      } else {
+        picked = bigTasks[0] || null;
+      }
+
+      return {
+        task: picked,
+        isRestFine: !picked,
+        message: picked ? null : "Rest is fine today",
+        energyLevel: level,
+      };
+    }
+
+    // Energy 5: gives the most urgent or biggest task
+    const bestBig = bigTasks[0] || null;
+    const mostUrgentOverall = [...openTasks].sort(compareDeadline)[0] || null;
+
+    if (bestBig && mostUrgentOverall) {
+      const urgentHasDeadline = getDeadlineTimestamp(mostUrgentOverall) < Number.MAX_SAFE_INTEGER;
+      const bigHasDeadline = getDeadlineTimestamp(bestBig) < Number.MAX_SAFE_INTEGER;
+
+      if (urgentHasDeadline && (!bigHasDeadline || getDeadlineTimestamp(mostUrgentOverall) < getDeadlineTimestamp(bestBig))) {
+        picked = mostUrgentOverall;
+      } else {
+        picked = bestBig;
+      }
+    } else {
+      picked = bestBig || mostUrgentOverall || null;
+    }
+
+    return {
+      task: picked,
+      isRestFine: !picked,
+      message: picked ? null : "Rest is fine today",
+      energyLevel: level,
+    };
+  }
+
+  /**
+   * Heavy week warning:
+   * Assume daily capacity of 10, 30, 60, 90 and 120 minutes for energy 1 to 5.
+   * Use the last chosen energy for today and level 3 for future days.
+   * If the minutes of work left before a deadline are more than the capacity until that deadline:
+   * Show: 'Your week looks heavy. Want to ask for a short extension, or make a task smaller?'
+   * Show it at most once per day.
+   */
+  checkHeavyWeek(energyLevel = 3, tasksList = null, options = {}) {
+    const now = options.now ? new Date(options.now) : new Date(this.now());
+    const force = Boolean(options.force);
+    const todayStr = options.todayStr || now.toISOString().split("T")[0];
+
+    // Show at most once per day
+    if (!force && this.lastWarningDate === todayStr) {
+      return {
+        warn: false,
+        reason: "already_shown_today",
+        date: todayStr,
+      };
+    }
+
+    const openTasks = (tasksList || this.getOpenTasks()).filter((t) => t && !t.completed);
+    const tasksWithDeadline = openTasks.filter((t) => Boolean(t.deadline || t.dueDate));
+
+    if (tasksWithDeadline.length === 0) {
+      return { warn: false, reason: "no_deadlines", date: todayStr };
+    }
+
+    const level = Math.max(1, Math.min(5, Number(energyLevel) || 3));
+    const todayCapacity = DAILY_CAPACITIES[level] || 60;
+    const futureDailyCapacity = DAILY_CAPACITIES[3]; // Level 3 = 60 min
+
+    const startOfToday = new Date(now);
+    startOfToday.setHours(0, 0, 0, 0);
+
+    // Group tasks by their deadline timestamps
+    const uniqueDeadlines = [...new Set(tasksWithDeadline.map((t) => getDeadlineTimestamp(t)))].sort((a, b) => a - b);
+
+    for (const deadlineTs of uniqueDeadlines) {
+      if (deadlineTs === Number.MAX_SAFE_INTEGER) continue;
+
+      const deadlineDate = new Date(deadlineTs);
+      const startOfDeadline = new Date(deadlineDate);
+      startOfDeadline.setHours(0, 0, 0, 0);
+
+      const diffDays = Math.max(0, Math.round((startOfDeadline.getTime() - startOfToday.getTime()) / (1000 * 60 * 60 * 24)));
+      const capacityUntilDeadline = todayCapacity + diffDays * futureDailyCapacity;
+
+      // Calculate minutes of open tasks due on or before this deadline
+      const workMinutesDue = tasksWithDeadline
+        .filter((t) => getDeadlineTimestamp(t) <= deadlineTs)
+        .reduce((acc, t) => acc + (SIZE_MINUTES[t.size] || 15), 0);
+
+      if (workMinutesDue > capacityUntilDeadline) {
+        if (!options.dryRun) {
+          this.lastWarningDate = todayStr;
+          this.saveSettings();
+        }
+        return {
+          warn: true,
+          message: "Your week looks heavy. Want to ask for a short extension, or make a task smaller?",
+          date: todayStr,
+          workMinutes: workMinutesDue,
+          capacity: capacityUntilDeadline,
+          daysUntil: diffDays,
+        };
+      }
+    }
+
+    return { warn: false, date: todayStr };
+  }
+}
+
+const defaultInstance = new PlannerLite();
+
+module.exports = {
+  PlannerLite,
+  TASK_SIZES,
+  SIZE_MINUTES,
+  DAILY_CAPACITIES,
+  FORBIDDEN_WORDS,
+  checkNoForbiddenWords,
+  sanitizeForbiddenWords,
+  formatDeadlineDate,
+  getInstance: () => defaultInstance,
+  getOpenTasks: () => defaultInstance.getOpenTasks(),
+  addTask: (data) => defaultInstance.addTask(data),
+  deleteTask: (id) => defaultInstance.deleteTask(id),
+  pickTask: (level, tasks) => defaultInstance.pickTask(level, tasks),
+  checkHeavyWeek: (level, tasks, options) => defaultInstance.checkHeavyWeek(level, tasks, options),
+};

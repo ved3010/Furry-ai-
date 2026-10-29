@@ -99,7 +99,7 @@
         if (window.electronAPI?.energySet) {
           try { await window.electronAPI.energySet(lvl); } catch (_) {}
         }
-        goToMainChatWithEnergy(lvl);
+        await showTodaysPick(lvl);
       });
 
       btn.addEventListener("mouseenter", () => {
@@ -115,7 +115,7 @@
         if (window.electronAPI?.energySkip) {
           try { await window.electronAPI.energySkip(); } catch (_) {}
         }
-        goToMainChatWithEnergy(3);
+        await showTodaysPick(3);
       });
 
       skipBtn.addEventListener("mouseenter", () => {
@@ -372,6 +372,202 @@
     }
   }
 
+  function escapeHtml(str) {
+    if (!str || typeof str !== "string") return "";
+    return str
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  function formatDeadlineDisplay(deadline) {
+    if (!deadline) return "";
+    const d = new Date(deadline);
+    if (isNaN(d.getTime())) return "";
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const target = new Date(d);
+    target.setHours(0, 0, 0, 0);
+    const diffMs = target.getTime() - now.getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+    if (diffDays < 0) {
+      return "waiting for you";
+    }
+    if (diffDays === 0) {
+      return "Due today";
+    }
+    if (diffDays === 1) {
+      return "Due tomorrow";
+    }
+    return `Due ${d.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`;
+  }
+
+  async function showTodaysPick(level = 3) {
+    if (!bubble) return;
+    isPromptOpen = true;
+    isInteractiveFlow = true;
+    setPromptMouseEvents(true);
+
+    const num = Math.max(1, Math.min(5, Number(level) || 3));
+    const info = ENERGY_OPTIONS.find((o) => o.level === num) || ENERGY_OPTIONS[2];
+
+    bubble.innerHTML = `
+      <div class="tiny-step-ai-container" style="max-width: 275px; text-align: center; padding: 12px 0;">
+        <div style="font-size: 13px; color: #ffffff; opacity: 0.95;">
+          🐾 Picking today's best task for ${info.name}...
+        </div>
+      </div>
+    `;
+
+    let pickResult = null;
+    try {
+      if (window.electronAPI?.plannerTodayPick) {
+        pickResult = await window.electronAPI.plannerTodayPick({ energyLevel: num });
+      }
+    } catch (err) {
+      console.warn("[gentle-checkin-ui] plannerTodayPick error:", err);
+    }
+
+    if (!pickResult) {
+      pickResult = {
+        task: null,
+        isRestFine: true,
+        message: "Rest is fine today",
+        energyLevel: num,
+        heavyWarning: null,
+      };
+    }
+
+    renderTodaysPickView(pickResult, num, info);
+  }
+
+  function renderTodaysPickView(pickResult, level, info) {
+    if (!bubble) return;
+    isPromptOpen = true;
+    isInteractiveFlow = true;
+    setPromptMouseEvents(true);
+
+    const task = pickResult?.task || null;
+    const isRest = pickResult?.isRestFine || !task;
+    const heavyWarn = pickResult?.heavyWarning;
+    const warningText = heavyWarn?.message || "Your week looks heavy. Want to ask for a short extension, or make a task smaller?";
+
+    let heavyHtml = "";
+    if (heavyWarn && heavyWarn.warn) {
+      heavyHtml = `
+        <div class="planner-heavy-banner" style="font-size: 11px; line-height: 1.35; padding: 6px 8px; border-radius: 8px; background: rgba(245, 158, 11, 0.16); border: 1px solid rgba(245, 158, 11, 0.35); color: #fef3c7; margin-bottom: 6px; text-align: left;">
+          🐾 ${escapeHtml(warningText)}
+        </div>
+      `;
+    }
+
+    let cardHtml = "";
+    if (task) {
+      const sizeLabel = task.size === "Big" ? "Big (120 min)" : task.size === "Medium" ? "Medium (45 min)" : "Small (15 min)";
+      const deadlineBadge = formatDeadlineDisplay(task.deadline || task.dueDate);
+
+      cardHtml = `
+        <div class="gentle-energy-title" style="font-size: 11px; opacity: 0.85; margin-bottom: 3px;">
+          ${info.emoji} Level ${info.level} · Today's pick
+        </div>
+        <div class="tiny-step-step-card" style="margin-bottom: 8px;">
+          <div style="font-size: 13.5px; font-weight: 700; color: #ffffff; margin-bottom: 5px; word-break: break-word;">
+            ${escapeHtml(task.title)}
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center; flex-wrap: wrap; font-size: 11px;">
+            <span style="display: inline-block; padding: 2px 7px; border-radius: 999px; background: rgba(255,255,255,0.12); color: #ffffff; font-weight: 600;">
+              ${sizeLabel}
+            </span>
+            ${deadlineBadge ? `<span style="display: inline-block; padding: 2px 7px; border-radius: 999px; background: rgba(245,158,11,0.22); color: #fde68a; font-weight: 600;">${deadlineBadge}</span>` : ""}
+          </div>
+        </div>
+        <div style="display: flex; gap: 6px; width: 100%; box-sizing: border-box;">
+          <button type="button" class="gentle-checkin-btn btn-yes btn-accent" id="planner-start-step-btn" style="flex: 1 1 auto; height: 32px; font-size: 12px; padding: 0 8px;">
+            Start this step
+          </button>
+          <button type="button" class="gentle-checkin-btn btn-no" id="planner-show-other-btn" style="flex: 1 1 auto; height: 32px; font-size: 12px; padding: 0 8px;">
+            Show other tasks
+          </button>
+        </div>
+      `;
+    } else {
+      cardHtml = `
+        <div class="gentle-energy-title" style="font-size: 11px; opacity: 0.85; margin-bottom: 3px;">
+          ${info.emoji} Level ${info.level} · Today's pick
+        </div>
+        <div class="tiny-step-step-card" style="text-align: center; padding: 12px 8px; margin-bottom: 8px;">
+          <div style="font-size: 20px; margin-bottom: 4px;">💤 🐾</div>
+          <div style="font-size: 13.5px; font-weight: 700; color: #ffffff;">
+            Rest is fine today
+          </div>
+        </div>
+        <div style="display: flex; gap: 6px; width: 100%; box-sizing: border-box;">
+          <button type="button" class="gentle-checkin-btn btn-yes btn-accent" id="planner-show-other-btn" style="flex: 1 1 auto; height: 32px; font-size: 12px; padding: 0 8px;">
+            Show other tasks
+          </button>
+          <button type="button" class="gentle-checkin-btn btn-no" id="planner-close-pick-btn" style="flex: 0 0 60px; height: 32px; font-size: 12px;">
+            Close
+          </button>
+        </div>
+      `;
+    }
+
+    bubble.innerHTML = `
+      <div class="tiny-step-ai-container" style="max-width: 275px;">
+        ${heavyHtml}
+        ${cardHtml}
+      </div>
+    `;
+
+    bubble.setAttribute("aria-label", task ? `Today's pick: ${task.title}` : "Rest is fine today");
+    document.body.dataset.speech = "gentle-prompt";
+    setPromptMouseEvents(true);
+
+    const startBtn = bubble.querySelector("#planner-start-step-btn");
+    if (startBtn && task) {
+      startBtn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        currentTinyStepState.userWorkText = task.title;
+        currentTinyStepState.energyLevel = level;
+        currentTinyStepState.stepCount = 1;
+        renderStepLoading();
+        await requestAndRenderTinyStep({
+          text: task.title,
+          energyLevel: level,
+          isSmaller: false,
+          stepNumber: 1,
+        });
+      });
+      startBtn.addEventListener("mouseenter", () => setPromptMouseEvents(true));
+    }
+
+    const showOtherBtn = bubble.querySelector("#planner-show-other-btn");
+    if (showOtherBtn) {
+      showOtherBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        if (window.electronAPI?.openTasksWindow) {
+          window.electronAPI.openTasksWindow();
+        }
+        hideCheckInBubble(true);
+      });
+      showOtherBtn.addEventListener("mouseenter", () => setPromptMouseEvents(true));
+    }
+
+    const closeBtn = bubble.querySelector("#planner-close-pick-btn");
+    if (closeBtn) {
+      closeBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        e.preventDefault();
+        hideCheckInBubble(true);
+      });
+      closeBtn.addEventListener("mouseenter", () => setPromptMouseEvents(true));
+    }
+  }
+
   function goToMainChatWithEnergy(level) {
     hideCheckInBubble(true);
     if (window.electronAPI?.gentleCheckInRespond) {
@@ -494,6 +690,10 @@
 
   window.electronAPI?.onGentleCheckInShowEnergy?.((data) => {
     showEnergyPicker(data?.currentLevel);
+  });
+
+  window.electronAPI?.onGentleCheckInShowPick?.((data) => {
+    showTodaysPick(data?.energyLevel);
   });
 
   window.electronAPI?.onGentleCheckInHide?.(() => {

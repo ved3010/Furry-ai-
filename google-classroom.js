@@ -476,6 +476,7 @@ async function fetchAssignments() {
             dueTimestamp,
             dueInHours,
             isOverdue,
+            statusText: isOverdue ? "waiting for you" : (dueDateFormatted === "No due date" ? "No due date" : `Due ${dueDateFormatted}`),
             hasDueDate: Boolean(cw.dueDate),
             isSubmitted,
             submissionState,

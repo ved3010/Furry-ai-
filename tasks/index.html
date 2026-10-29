@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My tasks</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="tasks-container">
+    <header class="tasks-header">
+      <div class="header-icon">🐾</div>
+      <div class="header-text">
+        <h1>My tasks</h1>
+        <p class="header-subtitle">Gentle progress at your own pace.</p>
+      </div>
+    </header>
+
+    <!-- Add Task Form -->
+    <section class="task-form-card" aria-label="Add a new task">
+      <form id="add-task-form">
+        <div class="form-group">
+          <label for="task-title-input">Task</label>
+          <input
+            type="text"
+            id="task-title-input"
+            class="task-input"
+            placeholder="What would you like to work on?"
+            maxlength="140"
+            required
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="task-deadline-input">Deadline (optional)</label>
+            <input type="date" id="task-deadline-input" class="task-date-input" />
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="task-size-select">Size</label>
+            <select id="task-size-select" class="task-select">
+              <option value="Small" selected>Small (15 min)</option>
+              <option value="Medium">Medium (45 min)</option>
+              <option value="Big">Big (120 min)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" id="add-task-btn" class="btn btn-primary">Add task</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- Tasks List -->
+    <section class="tasks-list-section" aria-label="Your tasks list">
+      <div class="section-header">
+        <h2>Open tasks</h2>
+        <span id="tasks-count-badge" class="count-badge">0</span>
+      </div>
+
+      <div id="tasks-list" class="tasks-list">
+        <!-- Rendered dynamically -->
+      </div>
+    </section>
+
+    <footer class="tasks-footer">
+      <button type="button" id="close-btn" class="btn btn-secondary">Close</button>
+    </footer>
+  </div>
+
+  <script src="tasks.js"></script>
+</body>
+</html>

@@ -856,6 +856,8 @@ async function handleCheckClassroom(userMessage = "") {
           classroomId: a.id,
           link: a.link,
           dueDate: a.dueDate,
+          deadline: a.dueDate,
+          size: "Medium",
           completed: false,
           createdAt: now,
         });
@@ -899,7 +901,7 @@ async function handleCheckClassroom(userMessage = "") {
       if (pendingAssignments.length > 0) {
         lines.push(`📝 **Pending (${pendingAssignments.length}):**`);
         pendingAssignments.forEach((a, i) => {
-          const status = a.isOverdue ? "⚠️ Overdue" : a.dueDateFormatted === "No due date" ? "No due date" : `Due ${a.dueDateFormatted}`;
+          const status = a.isOverdue ? "🐾 waiting for you" : a.dueDateFormatted === "No due date" ? "No due date" : `Due ${a.dueDateFormatted}`;
           lines.push(`  ${i + 1}. **${a.title}** (${a.courseName}) — ${status}`);
         });
       } else {
@@ -936,7 +938,7 @@ async function handleCheckClassroom(userMessage = "") {
     }
 
     const items = pendingAssignments.map((a, i) => {
-      const status = a.isOverdue ? "⚠️ Overdue" : a.dueDateFormatted === "No due date" ? "No due date" : `Due ${a.dueDateFormatted}`;
+      const status = a.isOverdue ? "🐾 waiting for you" : a.dueDateFormatted === "No due date" ? "No due date" : `Due ${a.dueDateFormatted}`;
       return `${i + 1}. **${a.title}** (${a.courseName}) — ${status}`;
     }).join("\n");
 
@@ -1231,6 +1233,59 @@ ipcMain.handle("agent-memory-delete", (_event, id) => {
   return getPublicState();
 });
 ipcMain.handle("agent-panel-set-open", setPanelOpen);
+
+try {
+  ipcMain.handle("planner-tasks-get", () => {
+    loadState();
+    const planner = require("./planner-lite");
+    return tasks.filter((t) => !t.completed).map((t) => planner.getInstance().normalizeTask(t));
+  });
+
+  ipcMain.handle("planner-task-add", (_event, data) => {
+    loadState();
+    const planner = require("./planner-lite");
+    const rawTitle = String(data?.title || "").trim();
+    if (!rawTitle) return { ok: false, error: "Empty title" };
+    const size = data?.size || "Small";
+    const deadline = data?.deadline || null;
+    const task = {
+      id: `task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+      title: planner.sanitizeForbiddenWords(rawTitle),
+      deadline: deadline ? String(deadline).trim() : null,
+      size: size,
+      completed: false,
+      createdAt: new Date().toISOString(),
+    };
+    tasks.push(task);
+    saveTasks();
+    return { ok: true, task: planner.getInstance().normalizeTask(task) };
+  });
+
+  ipcMain.handle("planner-task-delete", (_event, id) => {
+    loadState();
+    const before = tasks.length;
+    tasks = tasks.filter((t) => t.id !== id);
+    if (tasks.length !== before) {
+      saveTasks();
+      return { ok: true };
+    }
+    return { ok: false };
+  });
+
+  ipcMain.handle("planner-today-pick", (_event, params) => {
+    loadState();
+    const planner = require("./planner-lite");
+    const catEnergy = require("./cat-energy");
+    const level = Number(params?.energyLevel) || catEnergy.getEnergyLevel();
+    const normalizedTasks = tasks.filter((t) => !t.completed).map((t) => planner.getInstance().normalizeTask(t));
+    const pick = planner.pickTask(level, normalizedTasks);
+    const heavyWarning = planner.checkHeavyWeek(level, normalizedTasks);
+    return {
+      ...pick,
+      heavyWarning: heavyWarning.warn ? heavyWarning : null,
+    };
+  });
+} catch (_) {}
 
 async function handleRpc(method, payload) {
   if (method === "state-get") return getPublicState();
