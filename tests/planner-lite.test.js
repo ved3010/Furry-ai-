@@ -341,3 +341,101 @@ test("No forbidden words: Check planner source and UI files for forbidden words 
   const restMessage = "Rest is fine today";
   assert.equal(checkNoForbiddenWords(restMessage), true);
 });
+
+// -------------------------------------------------------------
+// 5. Chat task extraction, editing, and notifications
+// -------------------------------------------------------------
+test("Chat extraction: Extracts task titles and deadlines from user chat text", () => {
+  const { extractTasksFromChat } = require("../planner-lite");
+  const mockNow = new Date("2026-10-29T12:00:00.000Z"); // Thursday
+
+  // Case 1: Simple task with "by tomorrow"
+  const single = extractTasksFromChat("I need to finish math homework by tomorrow", mockNow);
+  assert.equal(single.length, 1);
+  assert.equal(single[0].title, "math homework");
+  assert.equal(single[0].deadline, "2026-10-30");
+  assert.equal(single[0].size, "Medium");
+
+  // Case 2: Multiple tasks with sizes, extra info, and weekday deadline
+  const multi = extractTasksFromChat(
+    "My tasks are buy groceries, finish history essay due Friday (notes: check rubric), and email teacher",
+    mockNow
+  );
+  assert.equal(multi.length, 3);
+  assert.equal(multi[0].title, "buy groceries");
+  assert.equal(multi[0].size, "Small");
+  assert.equal(multi[1].title, "finish history essay");
+  assert.equal(multi[1].deadline, "2026-10-30");
+  assert.equal(multi[1].size, "Big");
+  assert.equal(multi[1].extraInfo, "check rubric");
+  assert.equal(multi[2].title, "email teacher");
+  assert.equal(multi[2].size, "Small");
+});
+
+test("Task editing: PlannerLite updateTask modifies title, deadline, size, extraInfo, and notify", () => {
+  const { planner, cleanup } = createTestPlanner();
+  try {
+    const task = planner.addTask({
+      title: "Initial Draft",
+      deadline: "2026-11-01",
+      size: "Small",
+      extraInfo: "First note",
+      notify: true,
+    });
+    assert.ok(task && task.id);
+
+    // Edit the task
+    const updated = planner.updateTask(task.id, {
+      title: "Revised Final Paper",
+      deadline: "2026-11-04",
+      size: "Big",
+      extraInfo: "Updated note with references",
+      notify: false,
+    });
+
+    assert.equal(updated.title, "Revised Final Paper");
+    assert.equal(updated.deadline, "2026-11-04");
+    assert.equal(updated.size, "Big");
+    assert.equal(updated.minutes, 120);
+    assert.equal(updated.extraInfo, "Updated note with references");
+    assert.equal(updated.notify, false);
+
+    // Check persistence
+    const reloaded = planner.getOpenTasks().find((t) => t.id === task.id);
+    assert.equal(reloaded.title, "Revised Final Paper");
+    assert.equal(reloaded.size, "Big");
+  } finally {
+    cleanup();
+  }
+});
+
+test("Notifications: checkDueTasksForNotification triggers gentle notifications for due tasks", () => {
+  const { planner, cleanup } = createTestPlanner("2026-11-01T08:00:00.000Z");
+  try {
+    const tasks = [
+      { id: "1", title: "Chemistry Lab", deadline: "2026-11-01", notify: true }, // Due today
+      { id: "2", title: "English Poem", deadline: "2026-10-30", notify: true }, // Past (waiting for you)
+      { id: "3", title: "Future Project", deadline: "2026-11-10", notify: true }, // Future, not due yet
+      { id: "4", title: "Muted Homework", deadline: "2026-11-01", notify: false }, // Notify off
+    ];
+
+    const notifs = planner.checkDueTasksForNotification(new Date("2026-11-01T08:00:00.000Z"), tasks);
+    assert.equal(notifs.length, 2);
+
+    // First notif: due today
+    assert.equal(notifs[0].id, "1");
+    assert.ok(notifs[0].message.includes("due today"));
+
+    // Second notif: past due (never say overdue, say waiting for you)
+    assert.equal(notifs[1].id, "2");
+    assert.ok(notifs[1].message.includes("waiting for you"));
+    assert.equal(checkNoForbiddenWords(notifs[1].message), true);
+
+    // Once notified today, second check on same day should not notify again
+    const secondCheck = planner.checkDueTasksForNotification(new Date("2026-11-01T12:00:00.000Z"), tasks);
+    assert.equal(secondCheck.length, 0, "Should not notify again on same day");
+  } finally {
+    cleanup();
+  }
+});
+

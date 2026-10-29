@@ -223,15 +223,21 @@ class PlannerLite {
     const deadline = item.deadline || item.dueDate || null;
     const rawTitle = String(item.title || "Untitled task").trim();
     const title = sanitizeForbiddenWords(rawTitle);
+    const extraInfo = typeof item.extraInfo === "string" ? sanitizeForbiddenWords(item.extraInfo.trim()) : "";
+    const notify = typeof item.notify === "boolean" ? item.notify : Boolean(deadline);
 
     return {
       id: item.id || `task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       title,
-      deadline,
+      deadline: deadline ? String(deadline).trim() : null,
       size,
       minutes: SIZE_MINUTES[size] || 15,
+      extraInfo,
+      notify,
+      lastNotifiedDate: item.lastNotifiedDate || null,
       completed: Boolean(item.completed),
       createdAt: item.createdAt || new Date().toISOString(),
+      updatedAt: item.updatedAt || item.createdAt || new Date().toISOString(),
       classroomId: item.classroomId || null,
       link: item.link || null,
     };
@@ -242,7 +248,7 @@ class PlannerLite {
     return all.filter((t) => t && !t.completed);
   }
 
-  addTask({ title, deadline = null, size = TASK_SIZES.SMALL }) {
+  addTask({ title, deadline = null, size = TASK_SIZES.SMALL, extraInfo = "", notify = null }) {
     const rawTitle = String(title || "").trim();
     if (!rawTitle) return null;
     const cleanTitle = sanitizeForbiddenWords(rawTitle);
@@ -255,11 +261,45 @@ class PlannerLite {
       deadline: deadline ? String(deadline).trim() : null,
       size: normalizedSize,
       minutes: SIZE_MINUTES[normalizedSize],
+      extraInfo: extraInfo ? sanitizeForbiddenWords(String(extraInfo).trim()) : "",
+      notify: typeof notify === "boolean" ? notify : Boolean(deadline),
+      lastNotifiedDate: null,
       completed: false,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
 
     all.push(task);
+    this.saveTasks(all);
+    return task;
+  }
+
+  updateTask(id, updates = {}) {
+    const all = this.loadTasks();
+    const task = all.find((t) => t.id === id);
+    if (!task) return null;
+
+    if (typeof updates.title === "string" && updates.title.trim()) {
+      task.title = sanitizeForbiddenWords(updates.title.trim());
+    }
+    if (typeof updates.deadline !== "undefined") {
+      task.deadline = updates.deadline ? String(updates.deadline).trim() : null;
+    }
+    if (typeof updates.size === "string") {
+      task.size = normalizeTaskSize(updates.size);
+      task.minutes = SIZE_MINUTES[task.size];
+    }
+    if (typeof updates.extraInfo !== "undefined") {
+      task.extraInfo = updates.extraInfo ? sanitizeForbiddenWords(String(updates.extraInfo).trim()) : "";
+    }
+    if (typeof updates.notify !== "undefined") {
+      task.notify = Boolean(updates.notify);
+    }
+    if (typeof updates.completed === "boolean") {
+      task.completed = updates.completed;
+    }
+    task.updatedAt = new Date().toISOString();
+
     this.saveTasks(all);
     return task;
   }
@@ -492,6 +532,237 @@ class PlannerLite {
 
     return { warn: false, date: todayStr };
   }
+
+  checkDueTasksForNotification(now = new Date(), tasksList = null) {
+    const todayStr = (now instanceof Date ? now : new Date(now)).toISOString().split("T")[0];
+    const openTasks = (tasksList || this.getOpenTasks()).filter((t) => t && !t.completed && t.notify !== false && Boolean(t.deadline || t.dueDate));
+    const notifications = [];
+
+    for (const task of openTasks) {
+      if (task.lastNotifiedDate === todayStr) continue;
+      const d = new Date(task.deadline || task.dueDate);
+      if (isNaN(d.getTime())) continue;
+
+      const nowDate = new Date(now);
+      nowDate.setHours(0, 0, 0, 0);
+      const targetDate = new Date(d);
+      targetDate.setHours(0, 0, 0, 0);
+
+      const diffMs = targetDate.getTime() - nowDate.getTime();
+      const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+      if (diffDays === 0) {
+        task.lastNotifiedDate = todayStr;
+        notifications.push({
+          id: task.id,
+          title: task.title,
+          deadline: task.deadline || task.dueDate,
+          diffDays,
+          message: `🐾 Friendly reminder: "${task.title}" is due today! Take a gentle breath, no rush.`,
+        });
+      } else if (diffDays < 0) {
+        task.lastNotifiedDate = todayStr;
+        notifications.push({
+          id: task.id,
+          title: task.title,
+          deadline: task.deadline || task.dueDate,
+          diffDays,
+          message: `🐾 Gentle reminder: "${task.title}" is waiting for you whenever you are ready!`,
+        });
+      }
+    }
+
+    if (notifications.length > 0 && !tasksList) {
+      this.saveTasks();
+    }
+    return notifications;
+  }
+}
+
+function parseDeadlineFromText(text, now = new Date()) {
+  if (!text || typeof text !== "string") return { deadline: null, matchedPhrase: "" };
+  const s = text.toLowerCase();
+  const base = new Date(now);
+
+  const pad = (n) => String(n).padStart(2, "0");
+  const toYMD = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  // 1. "today", "tonight", "this evening"
+  const todayMatch = /\b(?:due|by|before|on)?\s*(today|tonight|this evening)\b/i.exec(text);
+  if (todayMatch) {
+    return { deadline: toYMD(base), matchedPhrase: todayMatch[0] };
+  }
+
+  // 2. "day after tomorrow"
+  const dayAfterMatch = /\b(?:due|by|before|on)?\s*(the\s+)?day after tomorrow\b/i.exec(text);
+  if (dayAfterMatch) {
+    const target = new Date(base);
+    target.setDate(target.getDate() + 2);
+    return { deadline: toYMD(target), matchedPhrase: dayAfterMatch[0] };
+  }
+
+  // 3. "tomorrow", "tmrw"
+  const tmrwMatch = /\b(?:due|by|before|on)?\s*(tomorrow|tmrw)\b/i.exec(text);
+  if (tmrwMatch) {
+    const target = new Date(base);
+    target.setDate(target.getDate() + 1);
+    return { deadline: toYMD(target), matchedPhrase: tmrwMatch[0] };
+  }
+
+  // 4. "in X days"
+  const inDaysMatch = /\b(?:in\s+)(\d{1,2})\s+days?\b/i.exec(text);
+  if (inDaysMatch) {
+    const days = parseInt(inDaysMatch[1], 10);
+    const target = new Date(base);
+    target.setDate(target.getDate() + days);
+    return { deadline: toYMD(target), matchedPhrase: inDaysMatch[0] };
+  }
+
+  // 5. Days of week: monday, tuesday, etc.
+  const daysOfWeek = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const dowRegex = new RegExp(`\\b(?:due|by|before|on|next)?\\s*(next\\s+)?(${daysOfWeek.join("|")})\\b`, "i");
+  const dowMatch = dowRegex.exec(text);
+  if (dowMatch) {
+    const targetDayName = dowMatch[2].toLowerCase();
+    const targetDayIdx = daysOfWeek.indexOf(targetDayName);
+    const currentDayIdx = base.getDay();
+    let diff = (targetDayIdx - currentDayIdx + 7) % 7;
+    if (diff === 0 || dowMatch[1]) diff += 7; // next week if already today or 'next' specified
+    const target = new Date(base);
+    target.setDate(target.getDate() + diff);
+    return { deadline: toYMD(target), matchedPhrase: dowMatch[0] };
+  }
+
+  // 6. Explicit dates: YYYY-MM-DD
+  const isoMatch = /\b(\d{4}-\d{2}-\d{2})\b/.exec(text);
+  if (isoMatch) {
+    return { deadline: isoMatch[1], matchedPhrase: isoMatch[0] };
+  }
+
+  // 7. Month name + day: e.g. "Nov 5", "Nov 5th", "November 5", "Oct 31"
+  const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+  const monthRegex = new RegExp(`\\b(?:due|by|before|on)?\\s*(${months.join("|")})[a-z]*\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`, "i");
+  const monthMatch = monthRegex.exec(text);
+  if (monthMatch) {
+    const mIdx = months.findIndex((m) => monthMatch[1].toLowerCase().startsWith(m));
+    const day = parseInt(monthMatch[2], 10);
+    const year = base.getFullYear();
+    const target = new Date(year, mIdx, day);
+    if (target.getTime() < base.getTime() - 86400000 * 30) {
+      target.setFullYear(year + 1);
+    }
+    return { deadline: toYMD(target), matchedPhrase: monthMatch[0] };
+  }
+
+  return { deadline: null, matchedPhrase: "" };
+}
+
+function inferTaskSize(title, fullText = "") {
+  const combined = `${title} ${fullText}`.toLowerCase();
+  if (/\b(?:big|huge|massive|large|120\s*m(?:in)?|essay|term\s*paper|project|presentation|thesis|dissertation|exam|final|report)\b/i.test(combined)) {
+    return TASK_SIZES.BIG;
+  }
+  if (/\b(?:small|tiny|quick|15\s*m(?:in)?|email|mail|message|call|download|print|upload|sign|submit\s*form|check|reply|grocer(?:y|ies)|buy|errand|chore)\b/i.test(combined)) {
+    return TASK_SIZES.SMALL;
+  }
+  return TASK_SIZES.MEDIUM;
+}
+
+function extractTasksFromChat(text, now = new Date()) {
+  if (!text || typeof text !== "string") return [];
+  const trimmed = text.trim();
+  if (!trimmed) return [];
+
+  // Ignore general conversational questions or meta commands
+  if (/^(?:help me|how (?:do|can|to)|what (?:is|should|are)|can you (?:help|explain|talk|tell)|make that|tell me)\b/i.test(trimmed)) {
+    if (!/\b(?:add|save|create|store|put|keep track of)\s+(?:a\s+)?(?:new\s+)?tasks?\b/i.test(trimmed)) {
+      return [];
+    }
+  }
+
+  // Must have clear task intent:
+  // - Starts with add/save/store task, remind me to
+  // - Starts with "tasks:", "to-do:", "assignments:", "here are my tasks", "my tasks are"
+  // - Or starts with "I need to / have to / want to finish/do..."
+  // - Or contains a deadline like "due tomorrow / by Friday" AND looks like a task item
+  // - Or has numbered list items (1. ..., 2. ...)
+  const hasTaskPrefix = /^(?:(?:please\s+)?(?:add|save|create|store|keep track of|remind me to)\b|(?:tasks?|to-?dos?|assignments?)\s*[:\-]|(?:here\s+are\s+(?:my\s+)?tasks|my\s+tasks\s+(?:are|is))|i\s+(?:need|have|want|got)\s+to\s+(?:do|finish|complete|submit|write|read|work on))\b/i.test(trimmed);
+  const hasNumberedList = /(?:^|\n)\s*[1-9][\.\)]\s+/.test(trimmed);
+  const { deadline: testDeadline } = parseDeadlineFromText(trimmed, now);
+  const hasDeadlineAndAction = Boolean(testDeadline) && /(?:finish|do|submit|write|read|work on|buy|call|study|review|send|prepare|turn in|complete|essay|hw|homework|assignment|project)\b/i.test(trimmed);
+
+  if (!hasTaskPrefix && !hasNumberedList && !hasDeadlineAndAction) {
+    return [];
+  }
+
+  // Remove generic chat wrappers
+  let cleaned = trimmed
+    .replace(/^(?:i (?:need|have|want|ought) to (?:do |finish |complete )?|my (?:tasks?|to-?do|assignments?) (?:are|is)?|please (?:add|save|create|store)|(?:add|save|create|store)\s+(?:task\s+)?|here are (?:my )?(?:tasks|to-?dos?)|tasks?|to-?do|remind me to|can you (?:save|add|keep track of))\s*[:\-]?\s*/i, "")
+    .trim();
+
+  // Split lines or delimiters
+  const lines = cleaned.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  let rawList = [];
+
+  for (const line of lines) {
+    if (/\b[1-9][\.\)]\s+/.test(line)) {
+      const parts = line.split(/\b[1-9][\.\)]\s+/).map((s) => s.trim()).filter(Boolean);
+      rawList.push(...parts);
+    } else if (line.includes(",") && lines.length === 1) {
+      const parts = line.split(",").map((s) => s.trim().replace(/^and\s+/i, "")).filter(Boolean);
+      rawList.push(...parts);
+    } else if (/\band\b/i.test(line) && lines.length === 1) {
+      const parts = line.split(/\band\b/i).map((s) => s.trim().replace(/^[,\s;]+|[,\s;]+$/g, "")).filter(Boolean);
+      rawList.push(...parts);
+    } else {
+      rawList.push(line);
+    }
+  }
+
+  const results = [];
+
+  for (const item of rawList) {
+    if (!item || item.length < 2) continue;
+
+    // Check for optional extra info like "(notes: ...)" or "notes: ..." or in brackets
+    let extraInfo = "";
+    let mainText = item;
+
+    const notesMatch = /(?:\(|\b)(?:notes?|info|details?):\s*([^)]+)(?:\)|$)/i.exec(item);
+    if (notesMatch) {
+      extraInfo = notesMatch[1].trim();
+      mainText = item.replace(notesMatch[0], "").trim();
+    }
+
+    // Parse deadline
+    const { deadline, matchedPhrase } = parseDeadlineFromText(mainText, now);
+    let title = mainText;
+    if (matchedPhrase) {
+      title = title.replace(matchedPhrase, " ").replace(/\s+/g, " ").trim();
+      // Clean trailing punctuation or prepositions
+      title = title.replace(/\b(?:by|due|before|on)$/i, "").trim();
+    }
+
+    // Clean leading bullets or ordinal numbers
+    title = title
+      .replace(/^[\d+]+[\.\)]\s*/, "")
+      .replace(/^[-*•]\s*/, "")
+      .replace(/^and\s+/i, "")
+      .trim();
+
+    if (!title) continue;
+
+    const size = inferTaskSize(title, item);
+    results.push({
+      title: sanitizeForbiddenWords(title),
+      deadline: deadline || null,
+      size,
+      extraInfo: sanitizeForbiddenWords(extraInfo),
+      notify: Boolean(deadline),
+    });
+  }
+
+  return results;
 }
 
 const defaultInstance = new PlannerLite();
@@ -505,10 +776,16 @@ module.exports = {
   checkNoForbiddenWords,
   sanitizeForbiddenWords,
   formatDeadlineDate,
+  parseDeadlineFromText,
+  inferTaskSize,
+  extractTasksFromChat,
   getInstance: () => defaultInstance,
   getOpenTasks: () => defaultInstance.getOpenTasks(),
   addTask: (data) => defaultInstance.addTask(data),
+  updateTask: (id, updates) => defaultInstance.updateTask(id, updates),
   deleteTask: (id) => defaultInstance.deleteTask(id),
   pickTask: (level, tasks) => defaultInstance.pickTask(level, tasks),
   checkHeavyWeek: (level, tasks, options) => defaultInstance.checkHeavyWeek(level, tasks, options),
+  checkDueTasksForNotification: (now, tasks) => defaultInstance.checkDueTasksForNotification(now, tasks),
 };
+

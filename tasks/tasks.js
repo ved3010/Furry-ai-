@@ -3,11 +3,28 @@
 (() => {
   const tasksListEl = document.getElementById("tasks-list");
   const countBadgeEl = document.getElementById("tasks-count-badge");
+  const refreshBtn = document.getElementById("refresh-btn");
   const addForm = document.getElementById("add-task-form");
   const titleInput = document.getElementById("task-title-input");
   const deadlineInput = document.getElementById("task-deadline-input");
   const sizeSelect = document.getElementById("task-size-select");
+  const notesInput = document.getElementById("task-notes-input");
+  const notifyCheckbox = document.getElementById("task-notify-checkbox");
   const closeBtn = document.getElementById("close-btn");
+
+  // Edit Modal Elements
+  const editModal = document.getElementById("edit-modal");
+  const editForm = document.getElementById("edit-task-form");
+  const editIdInput = document.getElementById("edit-task-id");
+  const editTitleInput = document.getElementById("edit-title-input");
+  const editDeadlineInput = document.getElementById("edit-deadline-input");
+  const editSizeSelect = document.getElementById("edit-size-select");
+  const editNotesInput = document.getElementById("edit-notes-input");
+  const editNotifyCheckbox = document.getElementById("edit-notify-checkbox");
+  const modalCloseBtn = document.getElementById("modal-close-btn");
+  const modalCancelBtn = document.getElementById("modal-cancel-btn");
+
+  let currentTasks = [];
 
   function formatDeadline(deadlineStr) {
     if (!deadlineStr) return null;
@@ -38,10 +55,11 @@
   }
 
   function renderTasks(tasks) {
+    currentTasks = Array.isArray(tasks) ? tasks : [];
     if (!tasksListEl) return;
     tasksListEl.innerHTML = "";
 
-    const openTasks = (tasks || []).filter((t) => t && !t.completed);
+    const openTasks = currentTasks.filter((t) => t && !t.completed);
     if (countBadgeEl) {
       countBadgeEl.textContent = String(openTasks.length);
     }
@@ -49,7 +67,7 @@
     if (openTasks.length === 0) {
       tasksListEl.innerHTML = `
         <div class="tasks-empty">
-          No tasks yet. Take a breath, or add something whenever you feel ready. 🌿
+          No tasks yet. Take a gentle breath, or tell the cat a task in chat! 🌿
         </div>
       `;
       return;
@@ -62,11 +80,21 @@
       const contentEl = document.createElement("div");
       contentEl.className = "task-item-content";
 
+      // Title
       const titleEl = document.createElement("div");
       titleEl.className = "task-item-title";
       titleEl.textContent = task.title || "Untitled task";
       contentEl.appendChild(titleEl);
 
+      // Notes / Extra Info
+      if (task.extraInfo) {
+        const notesEl = document.createElement("div");
+        notesEl.className = "task-item-notes";
+        notesEl.textContent = `📝 ${task.extraInfo}`;
+        contentEl.appendChild(notesEl);
+      }
+
+      // Metadata (Badges)
       const metaEl = document.createElement("div");
       metaEl.className = "task-item-meta";
 
@@ -88,13 +116,38 @@
         metaEl.appendChild(deadlineBadge);
       }
 
+      // Notification badge
+      if (task.notify) {
+        const notifyBadge = document.createElement("span");
+        notifyBadge.className = "notify-badge";
+        notifyBadge.title = "Notifications enabled for this task";
+        notifyBadge.textContent = "🔔";
+        metaEl.appendChild(notifyBadge);
+      }
+
       contentEl.appendChild(metaEl);
       itemEl.appendChild(contentEl);
 
-      // Delete button
+      // Action Buttons
+      const actionsEl = document.createElement("div");
+      actionsEl.className = "task-item-actions";
+
+      // Edit Button
+      const editBtn = document.createElement("button");
+      editBtn.type = "button";
+      editBtn.className = "task-action-btn edit";
+      editBtn.title = "Edit task & notes";
+      editBtn.setAttribute("aria-label", `Edit task: ${task.title}`);
+      editBtn.innerHTML = "✏️";
+      editBtn.addEventListener("click", () => {
+        openEditModal(task);
+      });
+      actionsEl.appendChild(editBtn);
+
+      // Delete Button
       const deleteBtn = document.createElement("button");
       deleteBtn.type = "button";
-      deleteBtn.className = "task-delete-btn";
+      deleteBtn.className = "task-action-btn delete";
       deleteBtn.title = "Delete task";
       deleteBtn.setAttribute("aria-label", `Delete task: ${task.title}`);
       deleteBtn.innerHTML = "🗑️";
@@ -106,9 +159,31 @@
           } catch (_) {}
         }
       });
+      actionsEl.appendChild(deleteBtn);
 
-      itemEl.appendChild(deleteBtn);
+      itemEl.appendChild(actionsEl);
       tasksListEl.appendChild(itemEl);
+    }
+  }
+
+  function openEditModal(task) {
+    if (!editModal || !task) return;
+    editIdInput.value = task.id;
+    editTitleInput.value = task.title || "";
+    editDeadlineInput.value = task.deadline || task.dueDate || "";
+    editSizeSelect.value = task.size || "Small";
+    editNotesInput.value = task.extraInfo || "";
+    editNotifyCheckbox.checked = Boolean(task.notify);
+
+    editModal.hidden = false;
+    requestAnimationFrame(() => {
+      editTitleInput.focus();
+    });
+  }
+
+  function closeEditModal() {
+    if (editModal) {
+      editModal.hidden = true;
     }
   }
 
@@ -123,6 +198,7 @@
     }
   }
 
+  // Add Form Submit
   if (addForm) {
     addForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -131,16 +207,61 @@
 
       const deadline = deadlineInput && deadlineInput.value ? deadlineInput.value : null;
       const size = sizeSelect ? sizeSelect.value : "Small";
+      const extraInfo = notesInput ? notesInput.value.trim() : "";
+      const notify = notifyCheckbox ? notifyCheckbox.checked : Boolean(deadline);
 
       if (window.electronAPI?.plannerTaskAdd) {
         try {
-          await window.electronAPI.plannerTaskAdd({ title, deadline, size });
+          await window.electronAPI.plannerTaskAdd({ title, deadline, size, extraInfo, notify });
           if (titleInput) titleInput.value = "";
           if (deadlineInput) deadlineInput.value = "";
+          if (notesInput) notesInput.value = "";
           await refreshTasks();
         } catch (_) {}
       }
     });
+  }
+
+  // Edit Form Submit
+  if (editForm) {
+    editForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const id = editIdInput ? editIdInput.value : "";
+      if (!id) return;
+
+      const title = editTitleInput ? editTitleInput.value.trim() : "";
+      const deadline = editDeadlineInput && editDeadlineInput.value ? editDeadlineInput.value : null;
+      const size = editSizeSelect ? editSizeSelect.value : "Small";
+      const extraInfo = editNotesInput ? editNotesInput.value.trim() : "";
+      const notify = editNotifyCheckbox ? editNotifyCheckbox.checked : false;
+
+      if (window.electronAPI?.plannerTaskUpdate) {
+        try {
+          await window.electronAPI.plannerTaskUpdate(id, {
+            title,
+            deadline,
+            size,
+            extraInfo,
+            notify,
+          });
+          closeEditModal();
+          await refreshTasks();
+        } catch (_) {}
+      }
+    });
+  }
+
+  // Modal Cancel & Close
+  if (modalCloseBtn) modalCloseBtn.addEventListener("click", closeEditModal);
+  if (modalCancelBtn) modalCancelBtn.addEventListener("click", closeEditModal);
+  if (editModal) {
+    editModal.addEventListener("click", (e) => {
+      if (e.target === editModal) closeEditModal();
+    });
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener("click", () => refreshTasks());
   }
 
   if (closeBtn) {
@@ -148,6 +269,11 @@
       window.close();
     });
   }
+
+  // Live Auto-Refresh when tasks are updated (e.g. from chat)
+  window.electronAPI?.onPlannerTasksChanged?.(() => {
+    refreshTasks();
+  });
 
   refreshTasks();
 })();

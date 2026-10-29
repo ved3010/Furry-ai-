@@ -969,10 +969,120 @@ function prioritizeTasksLocally(text, energyLevel = 3) {
   return { reply: result.reply, action: null };
 }
 
+function broadcastTasksUpdated() {
+  try {
+    const { BrowserWindow } = require("electron");
+    BrowserWindow.getAllWindows().forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("planner-tasks-changed");
+      }
+    });
+  } catch (_) {}
+}
+
+function notifyCatSpeech(text) {
+  try {
+    const { BrowserWindow, Notification } = require("electron");
+    try {
+      if (Notification && typeof Notification.isSupported === "function" && Notification.isSupported()) {
+        new Notification({ title: "Comnyang", body: text.replace(/^🐾\s*/, "") }).show();
+      }
+    } catch (_) {}
+    BrowserWindow.getAllWindows().forEach((win) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("cat-speech", { text, kind: "reminder", duration: 5200 });
+      }
+    });
+  } catch (_) {}
+}
+
+function syncChatTasksToPlanner(userMessage) {
+  try {
+    const planner = require("./planner-lite");
+    const extracted = planner.extractTasksFromChat(userMessage);
+    if (!extracted || extracted.length === 0) return [];
+
+    loadState();
+    const addedTasks = [];
+
+    for (const item of extracted) {
+      const normalizedTitle = item.title.toLowerCase();
+      const existing = tasks.find((t) => !t.completed && t.title.toLowerCase() === normalizedTitle);
+      if (!existing) {
+        const newTask = {
+          id: `task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
+          title: item.title,
+          deadline: item.deadline || null,
+          size: item.size || "Medium",
+          extraInfo: item.extraInfo || "",
+          notify: typeof item.notify === "boolean" ? item.notify : Boolean(item.deadline),
+          lastNotifiedDate: null,
+          completed: false,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        tasks.push(newTask);
+        addedTasks.push(newTask);
+      } else if (item.deadline && !existing.deadline) {
+        existing.deadline = item.deadline;
+        existing.updatedAt = new Date().toISOString();
+        addedTasks.push(existing);
+      }
+    }
+
+    if (addedTasks.length > 0) {
+      saveTasks();
+      broadcastTasksUpdated();
+      runDueTasksCheck();
+    }
+    return addedTasks;
+  } catch (err) {
+    console.warn("[agent-main] Failed to sync chat tasks to planner:", err?.message);
+    return [];
+  }
+}
+
+function runDueTasksCheck() {
+  try {
+    loadState();
+    const planner = require("./planner-lite");
+    const dueNotifications = planner.getInstance().checkDueTasksForNotification(new Date(), tasks);
+    if (dueNotifications && dueNotifications.length > 0) {
+      saveTasks();
+      for (const n of dueNotifications) {
+        notifyCatSpeech(n.message);
+      }
+    }
+  } catch (_) {}
+}
+
+try {
+  setInterval(runDueTasksCheck, 60 * 1000);
+  setTimeout(runDueTasksCheck, 5000);
+} catch (_) {}
+
 async function askModel(prompt) {
   loadState();
   const userMessage = normalizeText(prompt, 2_000);
   if (!userMessage) return { ok: false, reason: "empty" };
+
+  // Sync any tasks/deadlines mentioned by the user to My tasks
+  const addedTasks = syncChatTasksToPlanner(userMessage);
+  let savedTasksNote = "";
+  if (addedTasks.length > 0) {
+    const listBullets = addedTasks.map((t) => {
+      const dueStr = t.deadline ? ` (Due: ${t.deadline})` : "";
+      return `• **${t.title}**${dueStr} · ${t.size}`;
+    }).join("\n");
+    savedTasksNote = `\n\n🐾 *I stored ${addedTasks.length === 1 ? "this task" : "these tasks"} in your **My tasks** list:*\n${listBullets}`;
+  }
+
+  const withNote = (result) => {
+    if (savedTasksNote && result?.reply && !result.reply.includes("stored") && !result.reply.includes("My tasks")) {
+      return { ...result, reply: result.reply + savedTasksNote };
+    }
+    return result;
+  };
 
   // Useful local commands still work while the model provider is unavailable.
   const shortcut = inferShortcut(userMessage);
@@ -980,23 +1090,23 @@ async function askModel(prompt) {
     const action = normalizeAction(shortcut.action);
     if (action?.type === "check_classroom") {
       const classroomResult = await handleCheckClassroom(userMessage);
-      return buildActionResultReply(userMessage, shortcut.reply, action, classroomResult);
+      return withNote(buildActionResultReply(userMessage, shortcut.reply, action, classroomResult));
     }
     if (isAutoOpenAction(action)) {
       const result = await executeOpenAction(action);
-      return buildActionResultReply(userMessage, shortcut.reply, action, result);
+      return withNote(buildActionResultReply(userMessage, shortcut.reply, action, result));
     }
     const internalResult = applyInternalAction(action);
     if (!internalResult && hasApprovalGrant(action)) {
-      return buildActionResultReply(userMessage, shortcut.reply, action, await executeAction(action, "", "always"));
+      return withNote(buildActionResultReply(userMessage, shortcut.reply, action, await executeAction(action, "", "always")));
     }
-    return buildAgentReply(userMessage, shortcut.reply, action, internalResult);
+    return withNote(buildAgentReply(userMessage, shortcut.reply, action, internalResult));
   }
 
   // Fast local task prioritization if model is not configured
   if (isTaskPrioritizationRequest(userMessage) && !config.apiKey && !isLocalEndpoint(config.baseUrl)) {
     const localResult = prioritizeTasksLocally(userMessage, catEnergy.getEnergyLevel());
-    return buildAgentReply(userMessage, localResult.reply, null);
+    return withNote(buildAgentReply(userMessage, localResult.reply, null));
   }
 
   const systemPrompt = buildSystemPrompt();
@@ -1014,7 +1124,7 @@ async function askModel(prompt) {
     if (isTaskPrioritizationRequest(userMessage)) {
       console.warn("[Comnyang] model request failed, falling back to local energy task prioritization:", error?.message);
       const localResult = prioritizeTasksLocally(userMessage, catEnergy.getEnergyLevel());
-      return buildAgentReply(userMessage, localResult.reply, null);
+      return withNote(buildAgentReply(userMessage, localResult.reply, null));
     }
     if ((error?.code === "AGENT_RATE_LIMIT" || error?.code === "AGENT_TIMEOUT")
         && (config.model || "").includes("3.8")
@@ -1034,17 +1144,17 @@ async function askModel(prompt) {
   const action = normalizeAction(parsed?.action);
   if (action?.type === "check_classroom") {
     const classroomResult = await handleCheckClassroom(userMessage);
-    return buildActionResultReply(userMessage, reply, action, classroomResult);
+    return withNote(buildActionResultReply(userMessage, reply, action, classroomResult));
   }
   const internalResult = applyInternalAction(action);
   if (isAutoOpenAction(action) && hasExplicitOpenIntent(userMessage)) {
     const result = await executeOpenAction(action);
-    return buildActionResultReply(userMessage, reply, action, result);
+    return withNote(buildActionResultReply(userMessage, reply, action, result));
   }
   if (!internalResult && hasApprovalGrant(action)) {
-    return buildActionResultReply(userMessage, reply, action, await executeAction(action, "", "always"));
+    return withNote(buildActionResultReply(userMessage, reply, action, await executeAction(action, "", "always")));
   }
-  return buildAgentReply(userMessage, reply, action, internalResult);
+  return withNote(buildAgentReply(userMessage, reply, action, internalResult));
 }
 
 function expandUserPath(value) {
@@ -1248,16 +1358,58 @@ try {
     if (!rawTitle) return { ok: false, error: "Empty title" };
     const size = data?.size || "Small";
     const deadline = data?.deadline || null;
+    const extraInfo = data?.extraInfo || "";
+    const notify = typeof data?.notify === "boolean" ? data.notify : Boolean(deadline);
     const task = {
       id: `task-${Date.now()}-${Math.random().toString(16).slice(2, 8)}`,
       title: planner.sanitizeForbiddenWords(rawTitle),
       deadline: deadline ? String(deadline).trim() : null,
       size: size,
+      extraInfo: extraInfo ? planner.sanitizeForbiddenWords(String(extraInfo).trim()) : "",
+      notify,
+      lastNotifiedDate: null,
       completed: false,
       createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     tasks.push(task);
     saveTasks();
+    broadcastTasksUpdated();
+    runDueTasksCheck();
+    return { ok: true, task: planner.getInstance().normalizeTask(task) };
+  });
+
+  ipcMain.handle("planner-task-update", (_event, payload) => {
+    loadState();
+    const planner = require("./planner-lite");
+    const id = payload?.id;
+    const updates = payload?.updates || {};
+    const task = tasks.find((t) => t.id === id);
+    if (!task) return { ok: false, error: "Not found" };
+
+    if (typeof updates.title === "string" && updates.title.trim()) {
+      task.title = planner.sanitizeForbiddenWords(updates.title.trim());
+    }
+    if (typeof updates.deadline !== "undefined") {
+      task.deadline = updates.deadline ? String(updates.deadline).trim() : null;
+    }
+    if (typeof updates.size === "string") {
+      task.size = planner.normalizeTaskSize(updates.size);
+      task.minutes = planner.SIZE_MINUTES[task.size];
+    }
+    if (typeof updates.extraInfo !== "undefined") {
+      task.extraInfo = updates.extraInfo ? planner.sanitizeForbiddenWords(String(updates.extraInfo).trim()) : "";
+    }
+    if (typeof updates.notify !== "undefined") {
+      task.notify = Boolean(updates.notify);
+    }
+    if (typeof updates.completed === "boolean") {
+      task.completed = updates.completed;
+    }
+    task.updatedAt = new Date().toISOString();
+    saveTasks();
+    broadcastTasksUpdated();
+    runDueTasksCheck();
     return { ok: true, task: planner.getInstance().normalizeTask(task) };
   });
 
@@ -1267,6 +1419,7 @@ try {
     tasks = tasks.filter((t) => t.id !== id);
     if (tasks.length !== before) {
       saveTasks();
+      broadcastTasksUpdated();
       return { ok: true };
     }
     return { ok: false };

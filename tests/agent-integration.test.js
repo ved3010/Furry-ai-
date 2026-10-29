@@ -13,10 +13,11 @@ function harness(existingFiles = new Map(), options = {}) {
   const handlers = new Map();
   const files = existingFiles;
   const calls = [];
+  const norm = (f) => String(f || "").replace(/\\/g, "/");
   const fakeFs = {
-    mkdirSync() {}, chmodSync() {}, existsSync: (file) => files.has(file),
-    readFileSync: (file) => files.get(file), writeFileSync: (file, data) => files.set(file, data),
-    renameSync: (from, to) => { files.set(to, files.get(from)); files.delete(from); },
+    mkdirSync() {}, chmodSync() {}, existsSync: (file) => files.has(norm(file)),
+    readFileSync: (file) => files.get(norm(file)), writeFileSync: (file, data) => files.set(norm(file), data),
+    renameSync: (from, to) => { files.set(norm(to), files.get(norm(from))); files.delete(norm(from)); },
   };
   const server = { on() {}, listen() {}, close() {}, listening: false };
   const context = {
@@ -33,8 +34,23 @@ function harness(existingFiles = new Map(), options = {}) {
       if (name === "./tiny-step-ai") return require("../tiny-step-ai");
       if (name === "./cat-energy") return require("../cat-energy");
       if (name === "./agent-shortcuts") return require("../agent-shortcuts");
-      if (name === "./app-launcher") return require("../app-launcher");
+      if (name === "./app-launcher") return {
+        ...require("../app-launcher"),
+        openInBrave: (url, electronShell) => {
+          if (electronShell && typeof electronShell.openExternal === "function") {
+            electronShell.openExternal(url);
+          }
+          return { ok: true, launchedWith: "electron-shell", url };
+        },
+        openTarget: (target, electronShell) => {
+          if (electronShell && typeof electronShell.openExternal === "function") {
+            electronShell.openExternal(target);
+          }
+          return { ok: true, mode: "app", appName: target };
+        },
+      };
       if (name === "./google-classroom") return require("../google-classroom");
+      if (name === "./planner-lite") return require("../planner-lite");
       if (name === "./agent-music") return {
         ...require("../agent-music"), executeMusicAction: async (action) => { calls.push(["music", action]); return { ok: true, message: "Test player state" }; },
       };

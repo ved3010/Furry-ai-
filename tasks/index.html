@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My tasks</title>
+  <title>My tasks · Planner Lite</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
       <div class="header-icon">🐾</div>
       <div class="header-text">
         <h1>My tasks</h1>
-        <p class="header-subtitle">Gentle progress at your own pace.</p>
+        <p class="header-subtitle">Gentle progress at your own pace · No pressure</p>
       </div>
     </header>
 
@@ -20,13 +20,13 @@
     <section class="task-form-card" aria-label="Add a new task">
       <form id="add-task-form">
         <div class="form-group">
-          <label for="task-title-input">Task</label>
+          <label for="task-title-input">Task Title</label>
           <input
             type="text"
             id="task-title-input"
             class="task-input"
-            placeholder="What would you like to work on?"
-            maxlength="140"
+            placeholder="e.g. Math homework, History essay..."
+            maxlength="160"
             required
             autocomplete="off"
           />
@@ -48,8 +48,28 @@
           </div>
         </div>
 
-        <div class="form-actions">
-          <button type="submit" id="add-task-btn" class="btn btn-primary">Add task</button>
+        <div class="form-group">
+          <label for="task-notes-input">Notes & Extra Info (optional)</label>
+          <input
+            type="text"
+            id="task-notes-input"
+            class="task-input"
+            placeholder="e.g. Chapter 4-5, rubric link, problem set #1-8..."
+            maxlength="240"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="form-footer-row">
+          <label class="notification-checkbox-label">
+            <input type="checkbox" id="task-notify-checkbox" checked />
+            <span class="custom-checkbox"></span>
+            <span class="checkbox-text">🔔 Notify me when due</span>
+          </label>
+
+          <button type="submit" id="add-task-btn" class="btn btn-primary">
+            + Add task
+          </button>
         </div>
       </form>
     </section>
@@ -57,8 +77,13 @@
     <!-- Tasks List -->
     <section class="tasks-list-section" aria-label="Your tasks list">
       <div class="section-header">
-        <h2>Open tasks</h2>
-        <span id="tasks-count-badge" class="count-badge">0</span>
+        <div class="section-title-wrap">
+          <h2>Open tasks</h2>
+          <span id="tasks-count-badge" class="count-badge">0</span>
+        </div>
+        <div class="section-actions">
+          <button type="button" id="refresh-btn" class="btn-icon" title="Refresh list">↻</button>
+        </div>
       </div>
 
       <div id="tasks-list" class="tasks-list">
@@ -69,6 +94,73 @@
     <footer class="tasks-footer">
       <button type="button" id="close-btn" class="btn btn-secondary">Close</button>
     </footer>
+  </div>
+
+  <!-- Edit Task Modal -->
+  <div id="edit-modal" class="modal-overlay" hidden>
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>Edit task</h3>
+        <button type="button" id="modal-close-btn" class="modal-close-icon">✕</button>
+      </div>
+
+      <form id="edit-task-form">
+        <input type="hidden" id="edit-task-id" />
+
+        <div class="form-group">
+          <label for="edit-title-input">Task Title</label>
+          <input
+            type="text"
+            id="edit-title-input"
+            class="task-input"
+            required
+            maxlength="160"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label for="edit-deadline-input">Deadline</label>
+            <input type="date" id="edit-deadline-input" class="task-date-input" />
+          </div>
+
+          <div class="form-group flex-1">
+            <label for="edit-size-select">Size</label>
+            <select id="edit-size-select" class="task-select">
+              <option value="Small">Small (15 min)</option>
+              <option value="Medium">Medium (45 min)</option>
+              <option value="Big">Big (120 min)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="edit-notes-input">Notes & Extra Info</label>
+          <input
+            type="text"
+            id="edit-notes-input"
+            class="task-input"
+            placeholder="Links, details, problem numbers..."
+            maxlength="240"
+            autocomplete="off"
+          />
+        </div>
+
+        <div class="form-footer-row">
+          <label class="notification-checkbox-label">
+            <input type="checkbox" id="edit-notify-checkbox" />
+            <span class="custom-checkbox"></span>
+            <span class="checkbox-text">🔔 Notify me when due</span>
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" id="modal-cancel-btn" class="btn btn-secondary">Cancel</button>
+          <button type="submit" id="modal-save-btn" class="btn btn-primary">Save changes</button>
+        </div>
+      </form>
+    </div>
   </div>
 
   <script src="tasks.js"></script>
